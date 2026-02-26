@@ -23,6 +23,7 @@
 #define DM_FLAG_FORCEPSAY		0x40
 #define DM_FLAG_SLOWBODY		0x80  //RS Edit || Ports CHOMPStation Pr 5161
 #define DM_FLAG_SLOWBRUTAL		0x100 //RS Edit
+#define DM_FLAG_DAMAGEICON		0x200 //RS ADD
 
 //Item related modes
 #define IM_HOLD									"Hold"
@@ -49,10 +50,14 @@
 #define SPONT_PREY "Spontaneous Prey"
 #define SPONT_PRED "Spontaneous Pred"
 #define DROP_VORE "Drop Vore"
+#define DROP_VORE_ON_OTHER "Drop Vore (You Drop On Them)" // Split for spont vore prefs (Lira, January 2026)
+#define DROP_VORE_ON_YOU "Drop Vore (They Drop On You)" // Split for spont vore prefs (Lira, January 2026)
 #define STUMBLE_VORE "Stumble Vore"
+#define BUCKLE_VORE "Buckle Vore" // Seperated out for spont vore prefs (Lira, January 2026)
 #define SLIP_VORE "Slip Vore"
 #define THROW_VORE "Throw Vore"
 #define FOOD_VORE "Food Vore"
+#define EMOTE_VORE "Emote Vore" // New emote spont vore (Lira, February 2026)
 #define MICRO_PICKUP "Micro Pickup"
 #define SPONT_TF "Spontaneous TF"
 #define RESIZING "Resizing"

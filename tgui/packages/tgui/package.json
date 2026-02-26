@@ -3,16 +3,14 @@
   "name": "tgui",
   "version": "4.4.1",
   "dependencies": {
-    "@popperjs/core": "^2.11.5",
-    "@types/marked": "^4.0.8",
+    "@popperjs/core": "^2.11.8",
     "common": "workspace:*",
     "dateformat": "^5.0.3",
-    "dompurify": "^2.3.8",
-    "highlight.js": "^11.5.1",
-    "inferno": "^7.4.11",
-    "inferno-vnode-flags": "^7.4.11",
-    "js-yaml": "^4.1.0",
-    "marked": "^4.0.16",
+    "dompurify": "^3.3.1",
+    "highlight.js": "^11.11.1",
+    "inferno": "^9.0.10",
+    "inferno-vnode-flags": "^9.0.10",
+    "js-yaml": "^4.1.1",
     "tgui-dev-server": "workspace:*",
     "tgui-polyfill": "workspace:*"
   }

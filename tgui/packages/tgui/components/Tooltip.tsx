@@ -1,10 +1,11 @@
 import { createPopper, Placement, VirtualElement } from '@popperjs/core';
-import { Component, findDOMfromVNode, InfernoNode, render } from 'inferno';
+import { Component, findDOMFromVNode, InfernoNode, render } from 'inferno'; // RS Edit: Inferno 7 to 9 (Lira, January 2026)
+import { tguiScalePopperModifier } from '../utils/uiScale'; // RS Add: Scaling tool (Lira, December 2025)
 
 type TooltipProps = {
-  children?: InfernoNode;
-  content: InfernoNode;
-  position?: Placement;
+  readonly children?: InfernoNode;
+  readonly content: InfernoNode;
+  readonly position?: Placement;
 };
 
 type TooltipState = {
@@ -17,6 +18,7 @@ const DEFAULT_OPTIONS = {
       name: 'eventListeners',
       enabled: false,
     },
+    tguiScalePopperModifier, // RS Add: Scaling tool (Lira, December 2025)
   ],
 };
 
@@ -57,7 +59,7 @@ export class Tooltip extends Component<TooltipProps, TooltipState> {
     // This code is copied from `findDOMNode` in inferno-extras.
     // Because this component is written in TypeScript, we will know
     // immediately if this internal variable is removed.
-    return findDOMfromVNode(this.$LI, true);
+    return findDOMFromVNode(this.$LI, true); // RS Edit: Inferno 7 to 9 (Lira, January 2026)
   }
 
   componentDidMount() {

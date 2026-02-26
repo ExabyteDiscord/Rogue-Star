@@ -1,7 +1,17 @@
 import { classes } from 'common/react';
 import { filter, sortBy } from 'common/collections';
 import { useBackend, useSharedState } from '../backend';
-import { Box, Button, LabeledList, Section, Flex, Tabs, ProgressBar, Stack, Icon } from '../components';
+import {
+  Box,
+  Button,
+  LabeledList,
+  Section,
+  Flex,
+  Tabs,
+  ProgressBar,
+  Stack,
+  Icon,
+} from '../components';
 import { Window } from '../layouts';
 import { flow } from 'common/fp';
 
@@ -286,7 +296,7 @@ const CrewCookieIcon = (props, context) => {
     <Section>
       {crewicon ? (
         <img
-          src={crewicon.substr(1, crewicon.length - 1)}
+          src={crewicon.substr(1, crewicon.length - 2)} // RS Edit
           style={{
             position: 'relative',
             left: 0,
@@ -295,7 +305,8 @@ const CrewCookieIcon = (props, context) => {
             bottom: 0,
             width: '128px',
             height: '128px',
-            '-ms-interpolation-mode': 'nearest-neighbor',
+            imageRendering: 'pixelated', // RS Add || For Chromium (516)
+            '-ms-interpolation-mode': 'nearest-neighbor', // For IE (515)
           }}
         />
       ) : (

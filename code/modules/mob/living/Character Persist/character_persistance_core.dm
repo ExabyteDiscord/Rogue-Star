@@ -62,6 +62,9 @@
 	var/old_path = "data/player_saves/[copytext(ckey, 1, 2)]/[ckey]/magic/[old_name]-etching.json"
 	if(!fexists(old_path))
 		return
+	var/name_option = "Transfer to [new_name]"
+	if(tgui_alert(src,"There is player persistent data associated with [old_name]. Do you want the charater persist data to be transferred to [new_name]? If so, the data will become available to [new_name], and become unavailable to [old_name]. Also, if there is any data associated with [new_name], it will be overwritten.","CHARACTER PERSIST RENAME",list(name_option,"Do not")) != name_option)
+		return
 	var/list/load = json_decode(file2text(old_path))
 
 	var/new_path = "data/player_saves/[copytext(ckey, 1, 2)]/[ckey]/magic/[new_name]-etching.json"
@@ -219,7 +222,7 @@
 		if(IsGuestKey(ourmob.key))
 			return
 
-	if((!savable && !event_character) || !needs_saving)
+	if(!savable || !needs_saving)
 		return
 
 	if(shutting_down)	//Don't try to save more than once if we're already saving and shutting down.
@@ -248,6 +251,8 @@
 	if(!json_to_file)
 		log_debug("Saving: [save_path] failed json encode.")
 		return
+
+	log_debug("ETCHING: save called on [ourmob]: [json_to_file]")
 
 	//Write it out
 	try
@@ -295,22 +300,20 @@
 		. += "<span class='boldnotice'>[capitalize(thing)]</span>: [xp[thing]]\n"
 
 /datum/etching/vv_edit_var(var_name, var_value)
+	if(var_name == "savable" || var_name == "unlockables")
+		return FALSE
 	if(var_name == "event_character")
 		enable_event_character()
-		return
-	else if(var_name == "savable")
+		. = TRUE
+	else if(!event_character)
 		return FALSE
-	else if(var_name == "unlockables")
-		return FALSE
-	if(!event_character)
-		return FALSE
-
 	else
 		needs_saving = TRUE
 		return ..()
 
 /datum/etching/get_view_variables_options()
-	return ..() + {"
+	. = ..()
+	. += {"
 	<option>---</option>
 	<option value='?_src_=vars;[HrefToken()];event_etching=\ref[src.ourmob]'>Toggle Event Character</option>
 	<option value='?_src_=vars;[HrefToken()];save_etching=\ref[src.ourmob]'>Save</option>
@@ -328,7 +331,7 @@
 	if(href_list["event_etching"])
 		if(!check_rights(R_FUN))	return
 
-		var/mob/living/L = locate(href_list["event_etching"])
+		var/mob/living/L = mob
 		if(!L.etching)
 			to_chat(usr, "\The [L] has no etching.")
 			return

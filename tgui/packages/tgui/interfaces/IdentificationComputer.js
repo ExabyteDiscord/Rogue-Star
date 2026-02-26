@@ -1,19 +1,28 @@
 import { sortBy } from 'common/collections';
 import { Fragment } from 'inferno';
 import { useBackend } from '../backend';
-import { Box, Button, Flex, Input, LabeledList, Section, Table, Tabs } from '../components';
+import {
+  Box,
+  Button,
+  Flex,
+  Input,
+  LabeledList,
+  Section,
+  Table,
+  Tabs,
+} from '../components';
 import { Window } from '../layouts';
 import { decodeHtmlEntities } from 'common/string';
 import { CrewManifestContent } from './CrewManifest';
 
 export const IdentificationComputer = () => {
   return (
-    <Window width={600} height={700}>
-      <Window.Content resizable>
+    <Window width={600} height={700} resizable>
+      <Window.Content scrollable>
         <IdentificationComputerContent />
       </Window.Content>
     </Window>
-  );
+  ); // RS Edit: Add scrollable
 };
 
 export const IdentificationComputerContent = (props, context) => {

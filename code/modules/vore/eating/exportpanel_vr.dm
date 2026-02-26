@@ -168,6 +168,7 @@
 			belly_data["bulge_size"] = B.bulge_size
 			belly_data["display_absorbed_examine"] = B.display_absorbed_examine
 			belly_data["save_digest_mode"] = B.save_digest_mode
+			belly_data["allow_external_feeding"] = B.allow_external_feeding // RS Add: Allow external feeding option (Lira, January 2026)
 			belly_data["emote_active"] = B.emote_active
 			belly_data["emote_time"] = B.emote_time
 			belly_data["shrink_grow_size"] = B.shrink_grow_size
@@ -200,5 +201,15 @@
 			belly_data["digestchance"] = B.digestchance
 
 			data["bellies"] += list(belly_data)
+
+			// Interactions (Auto-Transfer) || RS Add || Chomp Port 4734, 6155
+			belly_data["autotransferchance"] = B.autotransferchance
+			belly_data["autotransferwait"] = B.autotransferwait
+			belly_data["autotransferlocation"] = B.autotransferlocation
+			belly_data["autotransfer_enabled"] = B.autotransfer_enabled
+			belly_data["autotransferchance_secondary"] = B.autotransferchance_secondary
+			belly_data["autotransferlocation_secondary"] = B.autotransferlocation_secondary
+			belly_data["autotransfer_min_amount"] = B.autotransfer_min_amount
+			belly_data["autotransfer_max_amount"] = B.autotransfer_max_amount
 
 	return data

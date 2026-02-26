@@ -2,11 +2,13 @@
 // Vore management panel for players
 //
 
-#define BELLIES_MAX 40
-#define BELLIES_NAME_MIN 2
-#define BELLIES_NAME_MAX 40
-#define BELLIES_DESC_MAX 4096
-#define FLAVOR_MAX 400
+//////////////////////////////////////////////////////////////////////////////////
+//Updated by Lira for Rogue Star September 2025 to integrate trust list settings//
+//////////////////////////////////////////////////////////////////////////////////
+//Updated by Lira for Rogue Star October 2025 to integrate RSUI health bars///////
+//////////////////////////////////////////////////////////////////////////////////
+//Updated by Lira for Rogue Star January 2026 to add spont vore prefs/////////////
+//////////////////////////////////////////////////////////////////////////////////
 
 //INSERT COLORIZE-ONLY STOMACHS HERE
 var/global/list/belly_colorable_only_fullscreens = list("a_synth_flesh_mono",
@@ -22,6 +24,194 @@ var/global/list/belly_colorable_only_fullscreens = list("a_synth_flesh_mono",
 														"post_tumby_passage_fluidless",
 														"not_quite_tumby",
 														"could_it_be_a_tumby")
+
+// RS Add: Maps together var on mob to toggle pref, client pref, and whitelist flag (Lira, September 2025)
+var/static/list/vore_trustlist_preference_map = list(
+	"dropnom_prey" = list(
+		"host_var" = "can_be_drop_prey",
+		"client_var" = "can_be_drop_prey",
+		"trust_key" = SPONT_PREY,
+	),
+	"dropnom_pred" = list(
+		"host_var" = "can_be_drop_pred",
+		"client_var" = "can_be_drop_pred",
+		"trust_key" = SPONT_PRED,
+	),
+	"drop_vore" = list(
+		"host_var" = "drop_vore",
+		"client_var" = "drop_vore",
+		"trust_key" = DROP_VORE,
+	),
+	"slip_vore" = list(
+		"host_var" = "slip_vore",
+		"client_var" = "slip_vore",
+		"trust_key" = SLIP_VORE,
+	),
+	"stumble_vore" = list(
+		"host_var" = "stumble_vore",
+		"client_var" = "stumble_vore",
+		"trust_key" = STUMBLE_VORE,
+	),
+	// RS Add: Split from stumble (Lira, January 2026)
+	"buckle_vore" = list(
+		"host_var" = "buckle_vore",
+		"client_var" = "buckle_vore",
+		"trust_key" = BUCKLE_VORE,
+	),
+	"throw_vore" = list(
+		"host_var" = "throw_vore",
+		"client_var" = "throw_vore",
+		"trust_key" = THROW_VORE,
+	),
+	"food_vore" = list(
+		"host_var" = "food_vore",
+		"client_var" = "food_vore",
+		"trust_key" = FOOD_VORE,
+	),
+	// RS Add: New emote spont vore (Lira, February 2026)
+	"emote_vore" = list(
+		"host_var" = "emote_vore",
+		"client_var" = "emote_vore",
+		"trust_key" = EMOTE_VORE,
+	),
+	"pickup_pref" = list(
+		"host_var" = "pickup_pref",
+		"client_var" = "pickup_pref",
+		"trust_key" = MICRO_PICKUP,
+	),
+	"spontaneous_tf" = list(
+		"host_var" = "allow_spontaneous_tf",
+		"client_var" = "allow_spontaneous_tf",
+		"trust_key" = SPONT_TF,
+	),
+	"resize" = list(
+		"host_var" = "resizable",
+		"client_var" = "resizable",
+		"trust_key" = RESIZING,
+	)
+)
+
+// RS Add: Spont vore prefs (Lira, January 2026)
+var/static/list/spontaneous_belly_pref_keys = list(
+	DROP_VORE_ON_OTHER,
+	DROP_VORE_ON_YOU,
+	SLIP_VORE,
+	STUMBLE_VORE,
+	BUCKLE_VORE,
+	THROW_VORE,
+	FOOD_VORE,
+	EMOTE_VORE
+)
+
+// RS Add Start: Add RSUI healthbars to vore panel (Lira, October 2025)
+
+var/global/list/rsui_healthbar_overlay_states
+var/global/list/rsui_healthbar_preview_cache = list()
+
+/proc/rsui_healthbar_crop_icon(var/icon/I)
+	if(!I)
+		return null
+	var/width = I.Width()
+	var/height = I.Height()
+	if(!width || !height)
+		return I
+	var/min_x = width
+	var/max_x = 1
+	var/min_y = height
+	var/max_y = 1
+	for(var/y = 1; y <= height; y++)
+		for(var/x = 1; x <= width; x++)
+			if(I.GetPixel(x, y))
+				if(x < min_x)
+					min_x = x
+				if(x > max_x)
+					max_x = x
+				if(y < min_y)
+					min_y = y
+				if(y > max_y)
+					max_y = y
+	if(max_x < min_x || max_y < min_y)
+		return I
+	if(min_x > 1 || min_y > 1 || max_x < width || max_y < height)
+		I.Crop(min_x, min_y, max_x, max_y)
+	return I
+
+/proc/rsui_healthbar_init_states()
+	if(rsui_healthbar_overlay_states)
+		return
+	var/list/states = icon_states('icons/rogue-star/vore_healthbar.dmi')
+	if(!states)
+		states = list()
+	rsui_healthbar_overlay_states = list()
+	for(var/theme in rsui_healthbar_overlay_themes)
+		var/list/theme_states = list(
+			"under" = null,
+			"overlay" = null,
+		)
+		if("[theme]_under" in states)
+			theme_states["under"] = "[theme]_under"
+		var/list/candidates = list("[theme]_0", "[theme]_1", "[theme]_FALSE", "[theme]_TRUE", "[theme]_false", "[theme]_true", "[theme]_still", theme)
+		for(var/state_name in candidates)
+			if(state_name in states)
+				theme_states["overlay"] = state_name
+				break
+		rsui_healthbar_overlay_states[theme] = theme_states
+
+/proc/rsui_healthbar_get_preview(var/theme, var/preview_color)
+	var/cache_color = preview_color ? "[preview_color]" : ""
+	var/cache_key = "[theme]-[cache_color]"
+	var/cached = rsui_healthbar_preview_cache[cache_key]
+	if(cached)
+		return cached
+
+	var/icon/base_icon = icon('icons/rogue-star/vore_healthbar.dmi',"circle", SOUTH, 1)
+	if(!base_icon)
+		return null
+
+	if(!theme)
+		var/base_key = "__rsui_base_circle"
+		var/base_cached = rsui_healthbar_preview_cache[base_key]
+		if(!base_cached)
+			var/icon/no_theme_icon = new(base_icon)
+			rsui_healthbar_crop_icon(no_theme_icon)
+			base_cached = icon2base64(no_theme_icon)
+			rsui_healthbar_preview_cache[base_key] = base_cached
+		rsui_healthbar_preview_cache[cache_key] = base_cached
+		return base_cached
+
+	rsui_healthbar_init_states()
+	var/list/theme_states = rsui_healthbar_overlay_states[theme]
+	if(!theme_states)
+		var/fallback_base = rsui_healthbar_preview_cache["__rsui_base_circle"]
+		if(!fallback_base)
+			var/icon/fallback_icon = new(base_icon)
+			rsui_healthbar_crop_icon(fallback_icon)
+			fallback_base = icon2base64(fallback_icon)
+			rsui_healthbar_preview_cache["__rsui_base_circle"] = fallback_base
+		rsui_healthbar_preview_cache[cache_key] = fallback_base
+		return fallback_base
+
+	var/under_state = theme_states["under"]
+	if(under_state)
+		var/icon/under_icon = icon('icons/rogue-star/vore_healthbar.dmi', under_state, SOUTH, 1)
+		if(preview_color)
+			under_icon.Blend(preview_color, ICON_MULTIPLY)
+		base_icon.Blend(under_icon, ICON_OVERLAY)
+
+	var/overlay_state = theme_states["overlay"]
+	if(overlay_state)
+		var/icon/overlay_icon = icon('icons/rogue-star/vore_healthbar.dmi', overlay_state, SOUTH, 1)
+		if(preview_color)
+			overlay_icon.Blend(preview_color, ICON_MULTIPLY)
+		base_icon.Blend(overlay_icon, ICON_OVERLAY)
+
+	rsui_healthbar_crop_icon(base_icon)
+
+	var/base64 = icon2base64(base_icon)
+	rsui_healthbar_preview_cache[cache_key] = base64
+	return base64
+
+// RS Add End
 
 /mob
 	var/datum/vore_look/vorePanel
@@ -190,6 +380,18 @@ var/global/list/belly_colorable_only_fullscreens = list("a_synth_flesh_mono",
 	var/list/selected_list = null
 	if(host.vore_selected)
 		var/obj/belly/selected = host.vore_selected
+		// RS Add Start: Add RSUI healthbars to vore panel (Lira, October 2025)
+		var/list/healthbar_theme_cards = list()
+		for(var/theme in rsui_healthbar_overlay_themes)
+			var/list/card = list(
+				"name" = theme,
+				"preview" = rsui_healthbar_get_preview(theme, null),
+			)
+			healthbar_theme_cards += list(card)
+		var/healthbar_current_preview = null
+		if(selected.belly_healthbar_overlay_theme)
+			healthbar_current_preview = rsui_healthbar_get_preview(selected.belly_healthbar_overlay_theme, selected.belly_healthbar_overlay_color)
+		// RS Add End
 		selected_list = list(
 			"belly_name" = selected.name,
 			"is_wet" = selected.is_wet,
@@ -214,6 +416,7 @@ var/global/list/belly_colorable_only_fullscreens = list("a_synth_flesh_mono",
 			"digest_clone" = selected.digest_clone,
 			"bulge_size" = selected.bulge_size,
 			"save_digest_mode" = selected.save_digest_mode,
+			"allow_external_feeding" = selected.allow_external_feeding, // RS Add: Allow external feeding option (Lira, January 2026)
 			"display_absorbed_examine" = selected.display_absorbed_examine,
 			"shrink_grow_size" = selected.shrink_grow_size,
 			"emote_time" = selected.emote_time,
@@ -226,6 +429,10 @@ var/global/list/belly_colorable_only_fullscreens = list("a_synth_flesh_mono",
 			"belly_fullscreen_color_secondary" = selected.belly_fullscreen_color_secondary,
 			"belly_fullscreen_color_trinary" = selected.belly_fullscreen_color_trinary,
 			"colorization_enabled" = selected.colorization_enabled,
+			"belly_healthbar_overlay_theme" = selected.belly_healthbar_overlay_theme,	//RS ADD
+			"belly_healthbar_overlay_color" = selected.belly_healthbar_overlay_color,	//RS ADD
+			"healthbar_theme_options" = healthbar_theme_cards, // RS Add: Add RSUI healthbars to vore panel (Lira, October 2025)
+			"healthbar_current_preview" = healthbar_current_preview, // RS Add: Add RSUI healthbars to vore panel (Lira, October 2025)
 			"eating_privacy_local" = selected.eating_privacy_local,
 			"silicon_belly_overlay_preference"	= selected.silicon_belly_overlay_preference,
 			"visible_belly_minimum_prey"	= selected.visible_belly_minimum_prey,
@@ -345,8 +552,22 @@ var/global/list/belly_colorable_only_fullscreens = list("a_synth_flesh_mono",
 			selected_list["interacts"]["absorbchance"] = selected.absorbchance
 			selected_list["interacts"]["digestchance"] = selected.digestchance
 
+
+		selected_list["autotransfer_enabled"] = selected.autotransfer_enabled  //RS Add Start || Chomp Port 2821, 3194, 6155
+		selected_list["autotransfer"] = list()
+		if(selected.autotransfer_enabled)
+			selected_list["autotransfer"]["autotransferchance"] = selected.autotransferchance
+			selected_list["autotransfer"]["autotransferwait"] = selected.autotransferwait
+			selected_list["autotransfer"]["autotransferlocation"] = selected.autotransferlocation
+			selected_list["autotransfer"]["autotransferchance_secondary"] = selected.autotransferchance_secondary
+			selected_list["autotransfer"]["autotransferlocation_secondary"] = selected.autotransferlocation_secondary
+			selected_list["autotransfer"]["autotransfer_min_amount"] = selected.autotransfer_min_amount
+			selected_list["autotransfer"]["autotransfer_max_amount"] = selected.autotransfer_max_amount//RS Add End
+
 		selected_list["disable_hud"] = selected.disable_hud
 		selected_list["colorization_enabled"] = selected.colorization_enabled
+		selected_list["belly_healthbar_overlay_theme"] = selected.belly_healthbar_overlay_theme	//RS ADD
+		selected_list["belly_healthbar_overlay_color"] = selected.belly_healthbar_overlay_color	//RS ADD
 		selected_list["belly_fullscreen_color"] = selected.belly_fullscreen_color
 		selected_list["belly_fullscreen_color_secondary"] = selected.belly_fullscreen_color_secondary
 		selected_list["belly_fullscreen_color_trinary"] = selected.belly_fullscreen_color_trinary
@@ -403,8 +624,11 @@ var/global/list/belly_colorable_only_fullscreens = list("a_synth_flesh_mono",
 		"drop_vore" = host.drop_vore,
 		"slip_vore" = host.slip_vore,
 		"stumble_vore" = host.stumble_vore,
+		"buckle_vore" = host.buckle_vore, // RS Add: Split from stumble (Lira, January 2026)
 		"throw_vore" = host.throw_vore,
 		"food_vore" = host.food_vore,
+		"emote_vore" = host.emote_vore, // RS Add: New emote spont vore (Lira, February 2026)
+		"spont_belly_prefs" = islist(host.spont_belly_prefs) ? host.spont_belly_prefs.Copy() : list(), // RS Add: Spont vore prefs (Lira, January 2026)
 		"nutrition_message_visible" = host.nutrition_message_visible,
 		"nutrition_messages" = host.nutrition_messages,
 		"weight_message_visible" = host.weight_message_visible,
@@ -414,10 +638,86 @@ var/global/list/belly_colorable_only_fullscreens = list("a_synth_flesh_mono",
 		"allowcontamination" = istype(host, /mob/living/carbon/human) ? host:allow_contaminate : TRUE, // RS edit
 		"allowstripping" = istype(host, /mob/living/carbon/human) ? host:allow_stripping : TRUE, // RS edit
 		"allowssdvore" = host.ssd_vore, // RS edit
-		"glowing_belly"  = host.glowy_belly
+		"glowing_belly"  = host.glowy_belly,
+		"autotransferable" = host.autotransferable, //RS Add || Port Chomp 3200
 	)
 
+	// RS Add start: Trustlist data (Lira, September 2025)
+	var/list/trustlist_toggles = list()
+	if(host.client && host.client.prefs_vr)
+		if(islist(host.client.prefs_vr.vore_whitelist_toggles))
+			trustlist_toggles = host.client.prefs_vr.vore_whitelist_toggles.Copy()
+	data["trustlist_toggles"] = trustlist_toggles
+
+	var/trust_mode = WL_BOTH
+	if(host.client && host.client.prefs && host.client.prefs.vore_whitelist_preference)
+		trust_mode = host.client.prefs.vore_whitelist_preference
+	data["trustlist_mode"] = trust_mode
+	// RS Add End
+
 	return data
+
+// RS Add: Incorporate trustlist (Lira, September 2025)
+/datum/vore_look/proc/set_trustlist_preference_state(var/pref_id, var/state)
+	if(!pref_id || !host)
+		return FALSE
+
+	var/list/spec = vore_trustlist_preference_map[pref_id]
+	if(!spec)
+		return FALSE
+
+	var/host_var = spec["host_var"]
+	if(!(host_var in host.vars))
+		return FALSE
+
+	if(state)
+		state = lowertext(state)
+
+	var/trust_key = spec["trust_key"]
+	var/current_enabled = !!host.vars[host_var]
+	var/in_trust = FALSE
+	var/datum/vore_preferences/client_prefs = null
+	if(host.client && host.client.prefs_vr)
+		client_prefs = host.client.prefs_vr
+		if(!islist(client_prefs.vore_whitelist_toggles))
+			client_prefs.vore_whitelist_toggles = list()
+		if(trust_key)
+			in_trust = (trust_key in client_prefs.vore_whitelist_toggles)
+
+	var/current_state = "disabled"
+	if(current_enabled)
+		if(in_trust)
+			current_state = "trustlist"
+		else
+			current_state = "enabled"
+
+	if(!(state == "disabled" || state == "enabled" || state == "trustlist"))
+		switch(current_state)
+			if("disabled")
+				state = "enabled"
+			if("enabled")
+				state = "trustlist"
+			if("trustlist")
+				state = "disabled"
+
+	if(state == current_state)
+		return FALSE
+
+	var/enable_value = (state != "disabled")
+	host.vars[host_var] = enable_value
+
+	if(client_prefs)
+		var/client_var = spec["client_var"]
+		if(client_var && (client_var in client_prefs.vars))
+			client_prefs.vars[client_var] = enable_value
+		if(trust_key)
+			if(state == "trustlist")
+				client_prefs.vore_whitelist_toggles |= trust_key
+			else
+				client_prefs.vore_whitelist_toggles -= trust_key
+
+	unsaved_changes = TRUE
+	return TRUE
 
 /datum/vore_look/tgui_act(action, params)
 	if(..())
@@ -471,652 +771,7 @@ var/global/list/belly_colorable_only_fullscreens = list("a_synth_flesh_mono",
 
 //RS ADD START: Adds vorebelly importation from CHOMPStation PR6177
 		if("importpanel")
-			var/panel_choice = tgui_input_list(usr, "Belly Import", "Pick an option", list("Import all bellies from VRDB","Import one belly from VRDB"))
-			if(!panel_choice) return
-			var/pickOne = FALSE
-			if(panel_choice == "Import one belly from VRDB")
-				pickOne = TRUE
-			var/input_file = input(usr,"Please choose a valid VRDB file to import from.","Belly Import") as file
-			var/input_data
-			try
-				input_data = json_decode(file2text(input_file))
-			catch(var/exception/e)
-				tgui_alert_async(usr, "The supplied file contains errors: [e]", "Error!")
-				return FALSE
-
-			if(!islist(input_data))
-				tgui_alert_async(usr, "The supplied file was not a valid VRDB file.", "Error!")
-				return FALSE
-
-			var/list/valid_names = list()
-			var/list/valid_lists = list()
-			var/list/updated = list()
-
-			for(var/list/raw_list in input_data)
-				if(length(valid_names) >= BELLIES_MAX) //check if there are too many bellies in this list
-					tgui_alert_async(usr, "The supplied VRDB file contains TOO MANY bellies.", "Error!") //Supply error message to the user
-					break
-				if(!islist(raw_list)) //Verify the list is not empty, or initialized correctly
-					continue
-				if(!istext(raw_list["name"])) //Verify the list has a name to set the vorebelly as
-					continue
-				if(length(raw_list["name"]) > BELLIES_NAME_MAX || length(raw_list["name"]) < BELLIES_NAME_MIN) //Ensure each belly's name fits the length limits
-					continue
-				if(raw_list["name"] in valid_names)
-					continue
-				for(var/obj/belly/B in host.vore_organs)
-					if(lowertext(B.name) == lowertext(raw_list["name"]))
-						updated += raw_list["name"]
-						break
-				if(!pickOne && length(host.vore_organs)+length(valid_names)-length(updated) >= BELLIES_MAX)
-					continue
-				valid_names += raw_list["name"]
-				valid_lists += list(raw_list)
-
-			if(length(valid_names) <= 0)
-				tgui_alert_async(usr, "The supplied VRDB file does not contain any valid bellies.", "Error!")
-				return FALSE
-
-			if(pickOne) //Choose one vorebelly in the list
-				var/picked = tgui_input_list(usr, "Belly Import", "Which belly?", valid_names)
-				if(!picked) return
-				for(var/B in valid_lists)
-					if(lowertext(picked) == lowertext(B["name"]))
-						valid_names = list(picked)
-						valid_lists = list(B)
-						break
-				if(picked in updated)
-					updated = list(picked)
-				else
-					updated = list()
-
-			var/list/alert_msg = list()
-			if(length(valid_names)-length(updated) > 0)
-				alert_msg += "add [length(valid_names)-length(updated)] new bell[length(valid_names)-length(updated) == 1 ? "y" : "ies"]"
-			if(length(updated) > 0)
-				alert_msg += "update [length(updated)] existing bell[length(updated) == 1 ? "y" : "ies"]. Please make sure you have saved a copy of your existing bellies"
-
-			var/confirm = tgui_alert(host, "WARNING: This will [jointext(alert_msg," and ")]. You can revert the import by using the Reload Prefs button under Preferences as long as you don't Save Prefs. Are you sure?","Import bellies?",list("Yes","Cancel"))
-			if(confirm != "Yes") return FALSE
-
-			for(var/list/belly_data in valid_lists)
-				var/obj/belly/new_belly
-				for(var/obj/belly/existing_belly in host.vore_organs)
-					if(lowertext(existing_belly.name) == lowertext(belly_data["name"]))
-						new_belly = existing_belly
-						break
-				if(!new_belly && length(host.vore_organs) < BELLIES_MAX)
-					new_belly = new(host)
-					new_belly.name = belly_data["name"]
-				if(!new_belly) continue
-
-				// Controls
-				if(istext(belly_data["mode"])) //Set the mode of the vorebelly
-					var/new_mode = html_encode(belly_data["mode"])
-					if(new_mode in new_belly.digest_modes)
-						new_belly.digest_mode = new_mode
-
-				if(istext(belly_data["item_mode"])) //set the item mode of the vorebelly
-					var/new_item_mode = html_encode(belly_data["item_mode"])
-					if(new_item_mode in new_belly.item_digest_modes)
-						new_belly.item_digest_mode = new_item_mode
-
-				if(islist(belly_data["addons"]))
-					new_belly.mode_flags = 0
-					//new_belly.slow_digestion = FALSE
-					STOP_PROCESSING(SSbellies, new_belly)
-					STOP_PROCESSING(SSobj, new_belly)
-					START_PROCESSING(SSbellies, new_belly)
-					for(var/addon in belly_data["addons"])
-						new_belly.mode_flags += new_belly.mode_flag_list[addon]
-						//switch(addon) // Intent for future update; but does not currently exist in RS
-							//if("Slow Body Digestion")
-								//new_belly.slow_digestion = TRUE
-
-				// Descriptions
-				if(istext(belly_data["desc"]))
-					var/new_desc = html_encode(belly_data["desc"])
-					if(new_desc)
-						new_desc = readd_quotes(new_desc)
-					if(length(new_desc) > 0 && length(new_desc) <= BELLIES_DESC_MAX)
-						new_belly.desc = new_desc
-					else if(length(new_desc) > 0 && length(new_desc) >= BELLIES_DESC_MAX)
-						tgui_alert_async(usr, "Invalid description for the " + belly_data["name"] + " vorebelly! It is likely too long. The limit is 4096 characters.", "Error!") //Supply error message to the user
-
-				if(istext(belly_data["absorbed_desc"]))
-					var/new_absorbed_desc = html_encode(belly_data["absorbed_desc"])
-					if(new_absorbed_desc)
-						new_absorbed_desc = readd_quotes(new_absorbed_desc)
-					if(length(new_absorbed_desc) > 0 && length(new_absorbed_desc) <= BELLIES_DESC_MAX) //ensure belly description is within a valid length
-						new_belly.absorbed_desc = new_absorbed_desc
-					else if(length(new_absorbed_desc) > 0 && length(new_absorbed_desc) >= BELLIES_DESC_MAX) //if the description is too long and likely got truncated
-						tgui_alert_async(usr, "Invalid absorbed description. It is likely too long for the " + belly_data["name"] + " vorebelly! The limit is 4096 characters.", "Error!") //Supply error message to the user
-
-				if(istext(belly_data["vore_verb"]))
-					var/new_vore_verb = html_encode(belly_data["vore_verb"])
-					if(new_vore_verb)
-						new_vore_verb = readd_quotes(new_vore_verb)
-					if(length(new_vore_verb) >= BELLIES_NAME_MIN && length(new_vore_verb) <= BELLIES_NAME_MAX)
-						new_belly.vore_verb = new_vore_verb
-					else if(length(new_vore_verb) >= BELLIES_NAME_MIN && length(new_vore_verb) >= BELLIES_NAME_MAX) //if it's too long
-						tgui_alert_async(usr, "Invalid vore verb for the " + belly_data["name"] + " vorebelly! It is likely too long. The limit is 4096 characters.", "Error!") //Supply error message to the user
-
-				if(istext(belly_data["release_verb"]))
-					var/new_release_verb = html_encode(belly_data["release_verb"])
-					if(new_release_verb)
-						new_release_verb = readd_quotes(new_release_verb)
-					if(length(new_release_verb) >= BELLIES_NAME_MIN && length(new_release_verb) <= BELLIES_NAME_MAX)
-						new_belly.release_verb = new_release_verb
-					else if(length(new_release_verb) >= BELLIES_NAME_MIN && length(new_release_verb) >= BELLIES_NAME_MAX) //if it it's too long
-						tgui_alert_async(usr, "Invalid release verb for the " + belly_data["name"] + " vorebelly! It is likely too long. The limit is 4096 characters.", "Error!") //Supply error message to the user
-
-				if(islist(belly_data["digest_messages_prey"]))
-					var/new_digest_messages_prey = sanitize(jointext(belly_data["digest_messages_prey"],"\n\n"),MAX_MESSAGE_LEN,0,0,0)
-					if(new_digest_messages_prey)
-						new_belly.set_messages(new_digest_messages_prey,"dmp")
-					else if(length(new_digest_messages_prey) == MAX_MESSAGE_LEN) //if it's too long and likely got truncated
-						tgui_alert_async(usr, "Invalid prey digest messages. They are likely are too long for the " + belly_data["name"] + " vorebelly! The limit is 4096 characters.", "Error!") //Supply error message to the user
-
-				if(islist(belly_data["digest_messages_owner"]))
-					var/new_digest_messages_owner = sanitize(jointext(belly_data["digest_messages_owner"],"\n\n"),MAX_MESSAGE_LEN,0,0,0)
-					if(new_digest_messages_owner)
-						new_belly.set_messages(new_digest_messages_owner,"dmo")
-					else if(length(new_digest_messages_owner) == MAX_MESSAGE_LEN) //if it's too long and likely got truncated
-						tgui_alert_async(usr, "Invalid pred digest messages. They are likely are too long for the " + belly_data["name"] + " vorebelly! The limit is 4096 characters.", "Error!") //Supply error message to the user
-
-				if(islist(belly_data["absorb_messages_prey"]))
-					var/new_absorb_messages_prey = sanitize(jointext(belly_data["absorb_messages_prey"],"\n\n"),MAX_MESSAGE_LEN,0,0,0)
-					if(new_absorb_messages_prey)
-						new_belly.set_messages(new_absorb_messages_prey,"amp")
-					else if(length(new_absorb_messages_prey) == MAX_MESSAGE_LEN) //if it's too long and likely got truncated
-						tgui_alert_async(usr, "Invalid prey absorb messages. They are likely are too long for the " + belly_data["name"] + " vorebelly! The limit is 4096 characters.", "Error!") //Supply error message to the user
-
-				if(islist(belly_data["absorb_messages_owner"]))
-					var/new_absorb_messages_owner = sanitize(jointext(belly_data["absorb_messages_owner"],"\n\n"),MAX_MESSAGE_LEN,0,0,0)
-					if(new_absorb_messages_owner)
-						new_belly.set_messages(new_absorb_messages_owner,"amo")
-					else if(length(new_absorb_messages_owner) == MAX_MESSAGE_LEN) //if it's too long and likely got truncated
-						tgui_alert_async(usr, "Invalid prey absorb messages. They are likely are too long for the " + belly_data["name"] + " vorebelly! The limit is 4096 characters.", "Error!") //Supply error message to the user
-
-				if(islist(belly_data["unabsorb_messages_prey"]))
-					var/new_unabsorb_messages_prey = sanitize(jointext(belly_data["unabsorb_messages_prey"],"\n\n"),MAX_MESSAGE_LEN,0,0,0)
-					if(new_unabsorb_messages_prey)
-						new_belly.set_messages(new_unabsorb_messages_prey,"uamp")
-					else if(length(new_unabsorb_messages_prey) == MAX_MESSAGE_LEN) //if it's too long and likely got truncated
-						tgui_alert_async(usr, "Invalid prey unabsorb messages. They are likely are too long for the " + belly_data["name"] + " vorebelly! The limit is 4096 characters.", "Error!") //Supply error message to the user
-
-				if(islist(belly_data["unabsorb_messages_owner"]))
-					var/new_unabsorb_messages_owner = sanitize(jointext(belly_data["unabsorb_messages_owner"],"\n\n"),MAX_MESSAGE_LEN,0,0,0)
-					if(new_unabsorb_messages_owner)
-						new_belly.set_messages(new_unabsorb_messages_owner,"uamo")
-					else if(length(new_unabsorb_messages_owner) == MAX_MESSAGE_LEN) //if it's too long and likely got truncated
-						tgui_alert_async(usr, "Invalid pred unabsorb messages. They are likely are too long for the " + belly_data["name"] + " vorebelly! The limit is 4096 characters.", "Error!") //Supply error message to the user
-
-				if(islist(belly_data["struggle_messages_outside"]))
-					var/new_struggle_messages_outside = sanitize(jointext(belly_data["struggle_messages_outside"],"\n\n"),MAX_MESSAGE_LEN,0,0,0)
-					if(new_struggle_messages_outside)
-						new_belly.set_messages(new_struggle_messages_outside,"smo")
-					else if(length(new_struggle_messages_outside) == MAX_MESSAGE_LEN) //if it's too long and likely got truncated
-						tgui_alert_async(usr, "Invalid outside struggle messages. They are likely are too long for the " + belly_data["name"] + " vorebelly! The limit is 4096 characters.", "Error!") //Supply error message to the user
-
-				if(islist(belly_data["struggle_messages_inside"]))
-					var/new_struggle_messages_inside = sanitize(jointext(belly_data["struggle_messages_inside"],"\n\n"),MAX_MESSAGE_LEN,0,0,0)
-					if(new_struggle_messages_inside)
-						new_belly.set_messages(new_struggle_messages_inside,"smi")
-					else if(length(new_struggle_messages_inside) == MAX_MESSAGE_LEN) //if it's too long and likely got truncated
-						tgui_alert_async(usr, "Invalid inside struggle messages. They are likely are too long for the " + belly_data["name"] + " vorebelly! The limit is 4096 characters.", "Error!") //Supply error message to the user
-
-				if(islist(belly_data["absorbed_struggle_messages_outside"]))
-					var/new_absorbed_struggle_messages_outside = sanitize(jointext(belly_data["absorbed_struggle_messages_outside"],"\n\n"),MAX_MESSAGE_LEN,0,0,0)
-					if(new_absorbed_struggle_messages_outside)
-						new_belly.set_messages(new_absorbed_struggle_messages_outside,"asmo")
-					else if(length(new_absorbed_struggle_messages_outside) == MAX_MESSAGE_LEN) //if it's too long and likely got truncated
-						tgui_alert_async(usr, "Invalid outside absorbed struggle messages. They are likely are too long for the " + belly_data["name"] + " vorebelly! The limit is 4096 characters.", "Error!") //Supply error message to the user
-
-				if(islist(belly_data["absorbed_struggle_messages_inside"]))
-					var/new_absorbed_struggle_messages_inside = sanitize(jointext(belly_data["absorbed_struggle_messages_inside"],"\n\n"),MAX_MESSAGE_LEN,0,0,0)
-					if(new_absorbed_struggle_messages_inside)
-						new_belly.set_messages(new_absorbed_struggle_messages_inside,"asmi")
-					else if(length(new_absorbed_struggle_messages_inside) == MAX_MESSAGE_LEN) //if it's too long and likely got truncated
-						tgui_alert_async(usr, "Invalid inside absorbed struggle messages. They are likely are too long for the " + belly_data["name"] + " vorebelly! The limit is 4096 characters.", "Error!") //Supply error message to the user
-
-				if(islist(belly_data["examine_messages"]))
-					var/new_examine_messages = sanitize(jointext(belly_data["examine_messages"],"\n\n"),MAX_MESSAGE_LEN,0,0,0)
-					if(new_examine_messages)
-						new_belly.set_messages(new_examine_messages,"em")
-					else if(length(new_examine_messages) == MAX_MESSAGE_LEN) //if it's too long and likely got truncated
-						tgui_alert_async(usr, "Invalid examine messages. They are likely are too long for the " + belly_data["name"] + " vorebelly! The limit is 4096 characters.", "Error!") //Supply error message to the user
-
-				if(islist(belly_data["examine_messages_absorbed"]))
-					var/new_examine_messages_absorbed = sanitize(jointext(belly_data["examine_messages_absorbed"],"\n\n"),MAX_MESSAGE_LEN,0,0,0)
-					if(new_examine_messages_absorbed)
-						new_belly.set_messages(new_examine_messages_absorbed,"ema")
-					else if(length(new_examine_messages_absorbed) == MAX_MESSAGE_LEN) //if it's too long and likely got truncated
-						tgui_alert_async(usr, "Invalid absorbed examine messages. They are likely are too long for the " + belly_data["name"] + " vorebelly! The limit is 4096 characters.", "Error!") //Supply error message to the user
-
-				if(islist(belly_data["emotes_digest"]))
-					var/new_emotes_digest = sanitize(jointext(belly_data["emotes_digest"],"\n\n"),MAX_MESSAGE_LEN,0,0,0)
-					if(new_emotes_digest)
-						new_belly.set_messages(new_emotes_digest,"im_digest")
-					else if(length(new_emotes_digest) == MAX_MESSAGE_LEN) //if it's too long and likely got truncated
-						tgui_alert_async(usr, "Invalid digestion messages. They are likely are too long for the " + belly_data["name"] + " vorebelly! The limit is 4096 characters.", "Error!") //Supply error message to the user
-
-				if(islist(belly_data["emotes_hold"]))
-					var/new_emotes_hold = sanitize(jointext(belly_data["emotes_hold"],"\n\n"),MAX_MESSAGE_LEN,0,0,0)
-					if(new_emotes_hold)
-						new_belly.set_messages(new_emotes_hold,"im_hold")
-					else if(length(new_emotes_hold) == MAX_MESSAGE_LEN) //if it's too long and likely got truncated
-						tgui_alert_async(usr, "Invalid holding messages. They are likely are too long for the " + belly_data["name"] + " vorebelly! The limit is 4096 characters.", "Error!") //Supply error message to the user
-
-				if(islist(belly_data["emotes_holdabsorbed"]))
-					var/new_emotes_holdabsorbed = sanitize(jointext(belly_data["emotes_holdabsorbed"],"\n\n"),MAX_MESSAGE_LEN,0,0,0)
-					if(new_emotes_holdabsorbed)
-						new_belly.set_messages(new_emotes_holdabsorbed,"im_holdabsorbed")
-					else if(length(new_emotes_holdabsorbed) == MAX_MESSAGE_LEN) //if it's too long and likely got truncated
-						tgui_alert_async(usr, "Invalid absorbed-holding messages. They are likely are too long for the " + belly_data["name"] + " vorebelly! The limit is 4096 characters.", "Error!") //Supply error message to the user
-
-				if(islist(belly_data["emotes_absorb"]))
-					var/new_emotes_absorb = sanitize(jointext(belly_data["emotes_absorb"],"\n\n"),MAX_MESSAGE_LEN,0,0,0)
-					if(new_emotes_absorb)
-						new_belly.set_messages(new_emotes_absorb,"im_absorb")
-					else if(length(new_emotes_absorb) == MAX_MESSAGE_LEN) //if it's too long and likely got truncated
-						tgui_alert_async(usr, "Invalid absorbing messages. They are likely are too long for the " + belly_data["name"] + " vorebelly! The limit is 4096 characters.", "Error!") //Supply error message to the user
-
-				if(islist(belly_data["emotes_heal"]))
-					var/new_emotes_heal = sanitize(jointext(belly_data["emotes_heal"],"\n\n"),MAX_MESSAGE_LEN,0,0,0)
-					if(new_emotes_heal)
-						new_belly.set_messages(new_emotes_heal,"im_heal")
-					else if(length(new_emotes_heal) == MAX_MESSAGE_LEN) //if it's too long and likely got truncated
-						tgui_alert_async(usr, "Invalid healing messages. They are likely are too long for the " + belly_data["name"] + " vorebelly! The limit is 4096 characters.", "Error!") //Supply error message to the user
-
-				if(islist(belly_data["emotes_drain"]))
-					var/new_emotes_drain = sanitize(jointext(belly_data["emotes_drain"],"\n\n"),MAX_MESSAGE_LEN,0,0,0)
-					if(new_emotes_drain)
-						new_belly.set_messages(new_emotes_drain,"im_drain")
-					else if(length(new_emotes_drain) == MAX_MESSAGE_LEN) //if it's too long and likely got truncated
-						tgui_alert_async(usr, "Invalid draining messages. They are likely are too long for the " + belly_data["name"] + " vorebelly! The limit is 4096 characters.", "Error!") //Supply error message to the user
-
-				if(islist(belly_data["emotes_steal"]))
-					var/new_emotes_steal = sanitize(jointext(belly_data["emotes_steal"],"\n\n"),MAX_MESSAGE_LEN,0,0,0)
-					if(new_emotes_steal)
-						new_belly.set_messages(new_emotes_steal,"im_steal")
-					else if(length(new_emotes_steal) == MAX_MESSAGE_LEN) //if it's too long and likely got truncated
-						tgui_alert_async(usr, "Invalid size stealing messages. They are likely are too long for the " + belly_data["name"] + " vorebelly! The limit is 4096 characters.", "Error!") //Supply error message to the user
-
-				if(islist(belly_data["emotes_egg"]))
-					var/new_emotes_egg = sanitize(jointext(belly_data["emotes_egg"],"\n\n"),MAX_MESSAGE_LEN,0,0,0)
-					if(new_emotes_egg)
-						new_belly.set_messages(new_emotes_egg,"im_egg")
-					else if(length(new_emotes_egg) == MAX_MESSAGE_LEN) //if it's too long and likely got truncated
-						tgui_alert_async(usr, "Invalid egg messages. They are likely are too long for the " + belly_data["name"] + " vorebelly! The limit is 4096 characters.", "Error!") //Supply error message to the user
-
-				if(islist(belly_data["emotes_shrink"]))
-					var/new_emotes_shrink = sanitize(jointext(belly_data["emotes_shrink"],"\n\n"),MAX_MESSAGE_LEN,0,0,0)
-					if(new_emotes_shrink)
-						new_belly.set_messages(new_emotes_shrink,"im_shrink")
-					else if(length(new_emotes_shrink) == MAX_MESSAGE_LEN) //if it's too long and likely got truncated
-						tgui_alert_async(usr, "Invalid shrinking messages. They are likely are too long for the " + belly_data["name"] + " vorebelly! The limit is 4096 characters.", "Error!") //Supply error message to the user
-
-				if(islist(belly_data["emotes_grow"]))
-					var/new_emotes_grow = sanitize(jointext(belly_data["emotes_grow"],"\n\n"),MAX_MESSAGE_LEN,0,0,0)
-					if(new_emotes_grow)
-						new_belly.set_messages(new_emotes_grow,"im_grow")
-					else if(length(new_emotes_grow) == MAX_MESSAGE_LEN) //if it's too long and likely got truncated
-						tgui_alert_async(usr, "Invalid growing messages. They are likely are too long for the " + belly_data["name"] + " vorebelly! The limit is 4096 characters.", "Error!") //Supply error message to the user
-
-				if(islist(belly_data["emotes_unabsorb"]))
-					var/new_emotes_unabsorb = sanitize(jointext(belly_data["emotes_unabsorb"],"\n\n"),MAX_MESSAGE_LEN,0,0,0)
-					if(new_emotes_unabsorb)
-						new_belly.set_messages(new_emotes_unabsorb,"im_unabsorb")
-					else if(length(new_emotes_unabsorb) == MAX_MESSAGE_LEN) //if it's too long and likely got truncated
-						tgui_alert_async(usr, "Invalid unabsorb messages. They are likely are too long for the " + belly_data["name"] + " vorebelly! The limit is 4096 characters.", "Error!") //Supply error message to the user
-
-				// Options
-				if(isnum(belly_data["can_taste"]))
-					var/new_can_taste = belly_data["can_taste"]
-					if(new_can_taste == 0)
-						new_belly.can_taste = FALSE
-					if(new_can_taste == 1)
-						new_belly.can_taste = TRUE
-
-				if(isnum(belly_data["contaminates"]))
-					var/new_contaminates = belly_data["contaminates"]
-					if(new_contaminates == 0)
-						new_belly.contaminates = FALSE
-					if(new_contaminates == 1)
-						new_belly.contaminates = TRUE
-
-				if(istext(belly_data["contamination_flavor"]))
-					var/new_contamination_flavor = sanitize(belly_data["contamination_flavor"],MAX_MESSAGE_LEN,0,0,0)
-					if(new_contamination_flavor)
-						if(new_contamination_flavor in contamination_flavors)
-							new_belly.contamination_flavor = new_contamination_flavor
-
-				if(istext(belly_data["contamination_color"]))
-					var/new_contamination_color = sanitize(belly_data["contamination_color"],MAX_MESSAGE_LEN,0,0,0)
-					if(new_contamination_color)
-						if(new_contamination_color in contamination_colors)
-							new_belly.contamination_color = new_contamination_color
-
-				if(isnum(belly_data["nutrition_percent"]))
-					var/new_nutrition_percent = belly_data["nutrition_percent"]
-					new_belly.nutrition_percent = CLAMP(new_nutrition_percent,0.01,100)
-
-				if(isnum(belly_data["bulge_size"]))
-					var/new_bulge_size = belly_data["bulge_size"]
-					if(new_bulge_size == 0)
-						new_belly.bulge_size = 0
-					else
-						new_belly.bulge_size = CLAMP(new_bulge_size,0.25,2)
-
-				if(isnum(belly_data["display_absorbed_examine"]))
-					var/new_display_absorbed_examine = belly_data["display_absorbed_examine"]
-					if(new_display_absorbed_examine == 0)
-						new_belly.display_absorbed_examine = FALSE
-					if(new_display_absorbed_examine == 1)
-						new_belly.display_absorbed_examine = TRUE
-
-				if(isnum(belly_data["save_digest_mode"]))
-					var/new_save_digest_mode = belly_data["save_digest_mode"]
-					if(new_save_digest_mode == 0)
-						new_belly.save_digest_mode = FALSE
-					if(new_save_digest_mode == 1)
-						new_belly.save_digest_mode = TRUE
-
-				if(isnum(belly_data["emote_active"]))
-					var/new_emote_active = belly_data["emote_active"]
-					if(new_emote_active == 0)
-						new_belly.emote_active = FALSE
-					if(new_emote_active == 1)
-						new_belly.emote_active = TRUE
-
-				if(isnum(belly_data["emote_time"]))
-					var/new_emote_time = belly_data["emote_time"]
-					new_belly.emote_time = CLAMP(new_emote_time, 60, 600)
-
-				if(isnum(belly_data["digest_brute"]))
-					var/new_digest_brute = belly_data["digest_brute"]
-					new_belly.digest_brute = CLAMP(new_digest_brute, 0, 6)
-
-				if(isnum(belly_data["digest_burn"]))
-					var/new_digest_burn = belly_data["digest_burn"]
-					new_belly.digest_burn = CLAMP(new_digest_burn, 0, 6)
-
-				if(isnum(belly_data["digest_oxy"]))
-					var/new_digest_oxy = belly_data["digest_oxy"]
-					new_belly.digest_oxy = CLAMP(new_digest_oxy, 0, 12)
-
-				if(isnum(belly_data["digest_tox"]))
-					var/new_digest_tox = belly_data["digest_tox"]
-					new_belly.digest_tox = CLAMP(new_digest_tox, 0, 6)
-
-				if(isnum(belly_data["digest_clone"]))
-					var/new_digest_clone = belly_data["digest_clone"]
-					new_belly.digest_clone = CLAMP(new_digest_clone, 0, 6)
-
-				if(isnum(belly_data["shrink_grow_size"]))
-					var/new_shrink_grow_size = belly_data["shrink_grow_size"]
-					new_belly.shrink_grow_size = CLAMP(new_shrink_grow_size, 0.25, 2)
-
-				if(istext(belly_data["egg_type"]))
-					var/new_egg_type = sanitize(belly_data["egg_type"],MAX_MESSAGE_LEN,0,0,0)
-					if(new_egg_type)
-						if(new_egg_type in global_vore_egg_types)
-							new_belly.egg_type = new_egg_type
-
-				if(istext(belly_data["selective_preference"]))
-					var/new_selective_preference = belly_data["selective_preference"]
-					if(new_selective_preference == "Digest")
-						new_belly.selective_preference = DM_DIGEST
-					if(new_selective_preference == "Absorb")
-						new_belly.selective_preference = DM_ABSORB
-
-				// Sounds
-				if(isnum(belly_data["is_wet"]))
-					var/new_is_wet = belly_data["is_wet"]
-					if(new_is_wet == 0)
-						new_belly.is_wet = FALSE
-					if(new_is_wet == 1)
-						new_belly.is_wet = TRUE
-
-				if(isnum(belly_data["wet_loop"]))
-					var/new_wet_loop = belly_data["wet_loop"]
-					if(new_wet_loop == 0)
-						new_belly.wet_loop = FALSE
-					if(new_wet_loop == 1)
-						new_belly.wet_loop = TRUE
-
-				if(isnum(belly_data["fancy_vore"]))
-					var/new_fancy_vore = belly_data["fancy_vore"]
-					if(new_fancy_vore == 0)
-						new_belly.fancy_vore = FALSE
-					if(new_fancy_vore == 1)
-						new_belly.fancy_vore = TRUE
-
-				//Set vore sounds, if they exist. Otherwise set to default gulp/splatter for insert/release
-				if(new_belly.fancy_vore)
-					if(!(new_belly.vore_sound in fancy_vore_sounds))
-						new_belly.vore_sound = "Gulp"
-					if(!(new_belly.release_sound in fancy_vore_sounds))
-						new_belly.release_sound = "Splatter"
-				else
-					if(!(new_belly.vore_sound in classic_vore_sounds))
-						new_belly.vore_sound = "Gulp"
-					if(!(new_belly.release_sound in classic_vore_sounds))
-						new_belly.release_sound = "Splatter"
-
-				if(istext(belly_data["vore_sound"]))
-					var/new_vore_sound = sanitize(belly_data["vore_sound"],MAX_MESSAGE_LEN,0,0,0)
-					if(new_vore_sound)
-						if (new_belly.fancy_vore && (new_vore_sound in fancy_vore_sounds))
-							new_belly.vore_sound = new_vore_sound
-						if (!new_belly.fancy_vore && (new_vore_sound in classic_vore_sounds))
-							new_belly.vore_sound = new_vore_sound
-
-				if(istext(belly_data["release_sound"]))
-					var/new_release_sound = sanitize(belly_data["release_sound"],MAX_MESSAGE_LEN,0,0,0)
-					if(new_release_sound)
-						if (new_belly.fancy_vore && (new_release_sound in fancy_release_sounds))
-							new_belly.release_sound = new_release_sound
-						if (!new_belly.fancy_vore && (new_release_sound in classic_release_sounds))
-							new_belly.release_sound = new_release_sound
-
-				// Visuals
-				if(isnum(belly_data["affects_vore_sprites"]))
-					var/new_affects_vore_sprites = belly_data["affects_vore_sprites"]
-					if(new_affects_vore_sprites == 0)
-						new_belly.affects_vore_sprites = FALSE
-					if(new_affects_vore_sprites == 1)
-						new_belly.affects_vore_sprites = TRUE
-
-				if(isnum(belly_data["count_absorbed_prey_for_sprite"]))
-					var/new_count_absorbed_prey_for_sprite = belly_data["count_absorbed_prey_for_sprite"]
-					if(new_count_absorbed_prey_for_sprite == 0)
-						new_belly.count_absorbed_prey_for_sprite = FALSE
-					if(new_count_absorbed_prey_for_sprite == 1)
-						new_belly.count_absorbed_prey_for_sprite = TRUE
-
-				if(isnum(belly_data["absorbed_multiplier"]))
-					var/new_absorbed_multiplier = belly_data["absorbed_multiplier"]
-					new_belly.absorbed_multiplier = CLAMP(new_absorbed_multiplier, 0.1, 3)
-
-				if(isnum(belly_data["count_liquid_for_sprite"]))
-					var/new_count_liquid_for_sprite = belly_data["count_liquid_for_sprite"]
-					if(new_count_liquid_for_sprite == 0)
-						new_belly.count_liquid_for_sprite = FALSE
-					if(new_count_liquid_for_sprite == 1)
-						new_belly.count_liquid_for_sprite = TRUE
-
-				if(isnum(belly_data["liquid_multiplier"]))
-					var/new_liquid_multiplier = belly_data["liquid_multiplier"]
-					new_belly.liquid_multiplier = CLAMP(new_liquid_multiplier, 0.1, 10)
-
-				if(isnum(belly_data["reagent_touches"])) //Reagent bellies || RS Add || Chomp Port
-					var/new_reagent_touches = belly_data["reagent_touches"]
-					if(new_reagent_touches == 0)
-						new_belly.reagent_touches = FALSE
-					if(new_reagent_touches == 1)
-						new_belly.reagent_touches = TRUE
-
-				if(isnum(belly_data["count_items_for_sprite"]))
-					var/new_count_items_for_sprite = belly_data["count_items_for_sprite"]
-					if(new_count_items_for_sprite == 0)
-						new_belly.count_items_for_sprite = FALSE
-					if(new_count_items_for_sprite == 1)
-						new_belly.count_items_for_sprite = TRUE
-
-				if(isnum(belly_data["item_multiplier"]))
-					var/new_item_multiplier = belly_data["item_multiplier"]
-					new_belly.item_multiplier = CLAMP(new_item_multiplier, 0.1, 10)
-
-				if(isnum(belly_data["health_impacts_size"]))
-					var/new_health_impacts_size = belly_data["health_impacts_size"]
-					if(new_health_impacts_size == 0)
-						new_belly.health_impacts_size = FALSE
-					if(new_health_impacts_size == 1)
-						new_belly.health_impacts_size = TRUE
-
-				if(isnum(belly_data["resist_triggers_animation"]))
-					var/new_resist_triggers_animation = belly_data["resist_triggers_animation"]
-					if(new_resist_triggers_animation == 0)
-						new_belly.resist_triggers_animation = FALSE
-					if(new_resist_triggers_animation == 1)
-						new_belly.resist_triggers_animation = TRUE
-
-				if(isnum(belly_data["size_factor_for_sprite"])) //how large the vore-sprite is
-					var/new_size_factor_for_sprite = belly_data["size_factor_for_sprite"]
-					new_belly.size_factor_for_sprite = CLAMP(new_size_factor_for_sprite, 0.1, 3)
-
-				if(istext(belly_data["belly_sprite_to_affect"]))
-					var/new_belly_sprite_to_affect = sanitize(belly_data["belly_sprite_to_affect"],MAX_MESSAGE_LEN,0,0,0)
-					if(istype(host, /mob/living/carbon/human)) //workaround for vore belly sprites
-						var/mob/living/carbon/human/hhost = host
-						if(new_belly_sprite_to_affect)
-							if(new_belly_sprite_to_affect in hhost.vore_icon_bellies) //determine if it is normal or taur belly
-								new_belly.belly_sprite_to_affect = new_belly_sprite_to_affect
-
-				//determine if the HUD is to be disabled for the person inside or not
-				if(isnum(belly_data["disable_hud"]))
-					var/new_disable_hud = belly_data["disable_hud"]
-					if(new_disable_hud == 0)
-						new_belly.disable_hud = FALSE
-					if(new_disable_hud == 1)
-						new_belly.disable_hud = TRUE
-
-				//set the vore belly overlay
-				var/possible_fullscreens = icon_states('icons/mob/screen_full_colorized_vore.dmi')
-				if(!new_belly.colorization_enabled)
-					possible_fullscreens = icon_states('icons/mob/screen_full_vore.dmi')
-					possible_fullscreens -= "a_synth_flesh_mono"
-					possible_fullscreens -= "a_synth_flesh_mono_hole"
-					possible_fullscreens -= "a_anim_belly"
-				if(!(new_belly.belly_fullscreen in possible_fullscreens))
-					new_belly.belly_fullscreen = ""
-				else
-					tgui_alert_async(usr, "Invalid vorebelly overlay for the " + belly_data["name"] + " vorebelly!", "Error!") //Supply error message to the us
-
-				// Interactions
-				if(isnum(belly_data["escapable"]))
-					var/new_escapable = belly_data["escapable"]
-					if(new_escapable == 0)
-						new_belly.escapable = FALSE
-					if(new_escapable == 1)
-						new_belly.escapable = TRUE
-
-				if(isnum(belly_data["escapechance"]))
-					var/new_escapechance = belly_data["escapechance"]
-					new_belly.escapechance = sanitize_integer(new_escapechance, 0, 100, initial(new_belly.escapechance))
-
-				if(isnum(belly_data["escapetime"]))
-					var/new_escapetime = belly_data["escapetime"]
-					new_belly.escapetime = sanitize_integer(new_escapetime*10, 10, 600, initial(new_belly.escapetime))
-
-				if(isnum(belly_data["transferchance"]))
-					var/new_transferchance = belly_data["transferchance"]
-					new_belly.transferchance = sanitize_integer(new_transferchance, 0, 100, initial(new_belly.transferchance))
-
-				if(istext(belly_data["transferlocation"]))
-					var/new_transferlocation = sanitize(belly_data["transferlocation"],MAX_MESSAGE_LEN,0,0,0)
-					if(new_transferlocation)
-						for(var/obj/belly/existing_belly in host.vore_organs) //if the transfer location currently exists
-							if(existing_belly.name == new_transferlocation)
-								new_belly.transferlocation = new_transferlocation
-								break
-						if(new_transferlocation in valid_names)
-							new_belly.transferlocation = new_transferlocation
-						if(new_transferlocation == new_belly.name) //if the transfer location is to this belly
-							new_belly.transferlocation = null
-
-				if(isnum(belly_data["transferchance_secondary"]))
-					var/new_transferchance_secondary = belly_data["transferchance_secondary"]
-					new_belly.transferchance_secondary = sanitize_integer(new_transferchance_secondary, 0, 100, initial(new_belly.transferchance_secondary))
-
-				if(istext(belly_data["transferlocation_secondary"]))
-					var/new_transferlocation_secondary = sanitize(belly_data["transferlocation_secondary"],MAX_MESSAGE_LEN,0,0,0)
-					if(new_transferlocation_secondary)
-						for(var/obj/belly/existing_belly in host.vore_organs)
-							if(existing_belly.name == new_transferlocation_secondary)
-								new_belly.transferlocation_secondary = new_transferlocation_secondary
-								break
-						if(new_transferlocation_secondary in valid_names)
-							new_belly.transferlocation_secondary = new_transferlocation_secondary
-						if(new_transferlocation_secondary == new_belly.name)
-							new_belly.transferlocation_secondary = null
-
-				if(isnum(belly_data["absorbchance"]))
-					var/new_absorbchance = belly_data["absorbchance"]
-					new_belly.absorbchance = sanitize_integer(new_absorbchance, 0, 100, initial(new_belly.absorbchance))
-
-				if(isnum(belly_data["digestchance"]))
-					var/new_digestchance = belly_data["digestchance"]
-					new_belly.digestchance = sanitize_integer(new_digestchance, 0, 100, initial(new_belly.digestchance))
-
-				if(istext(belly_data["custom_reagentcolor"])) // Liquid bellies || RS Add || Chomp Port
-					var/custom_reagentcolor = sanitize_hexcolor(belly_data["custom_reagentcolor"],new_belly.custom_reagentcolor)
-					new_belly.custom_reagentcolor = custom_reagentcolor
-
-				if(istext(belly_data["mush_color"]))
-					var/mush_color = sanitize_hexcolor(belly_data["mush_color"],new_belly.mush_color)
-					new_belly.mush_color = mush_color
-
-				if(istext(belly_data["mush_alpha"]))
-					var/new_mush_alpha = sanitize_integer(belly_data["mush_alpha"],0,255,initial(new_belly.mush_alpha))
-					new_belly.mush_alpha = new_mush_alpha
-
-				if(isnum(belly_data["max_mush"]))
-					var/max_mush = belly_data["max_mush"]
-					new_belly.max_mush = CLAMP(max_mush, 0, 6000)
-
-				if(isnum(belly_data["min_mush"]))
-					var/min_mush = belly_data["min_mush"]
-					new_belly.min_mush = CLAMP(min_mush, 0, 100)
-
-				if(isnum(belly_data["liquid_overlay"]))
-					var/new_liquid_overlay = belly_data["liquid_overlay"]
-					if(new_liquid_overlay == 0)
-						new_belly.liquid_overlay = FALSE
-					if(new_liquid_overlay == 1)
-						new_belly.liquid_overlay = TRUE
-
-				if(isnum(belly_data["max_liquid_level"]))
-					var/max_liquid_level = belly_data["max_liquid_level"]
-					new_belly.max_liquid_level = CLAMP(max_liquid_level, 0, 100)
-
-				if(isnum(belly_data["mush_overlay"]))
-					var/new_mush_overlay = belly_data["mush_overlay"]
-					if(new_mush_overlay == 0)
-						new_belly.mush_overlay = FALSE
-					if(new_mush_overlay == 1)
-						new_belly.mush_overlay = TRUE // End liquid bellies
-
-				// After import updates
-				new_belly.items_preserved.Cut()
-
-			if(istype(host, /mob/living/carbon/human))
-				var/mob/living/carbon/human/hhost = host
-				hhost.update_fullness()
-			host.updateVRPanel()
-			unsaved_changes = TRUE
+			import_belly(host)
 			return TRUE
 
 //RS ADD END
@@ -1139,6 +794,26 @@ var/global/list/belly_colorable_only_fullscreens = list("a_synth_flesh_mono",
 
 		if("set_attribute")
 			return set_attr(usr, params)
+		// RS Add: Trustlist actions (Lira, September 2025)
+		if("set_preference_state")
+			set_trustlist_preference_state(params["pref"], params["state"])
+			return TRUE
+		if("trustlist_edit")
+			if(isliving(host))
+				var/mob/living/L = host
+				L.toggle_vore_whitelist()
+			return TRUE
+		if("trustlist_print")
+			if(isliving(host))
+				var/mob/living/L = host
+				L.print_vore_whitelist()
+			return TRUE
+		if("trustlist_mode")
+			if(isliving(host))
+				var/mob/living/L = host
+				L.toggle_vore_trustlist_mode(params["mode"])
+			return TRUE
+		// RS Add End
 
 		if("saveprefs")
 			if(isnewplayer(host))
@@ -1207,16 +882,10 @@ var/global/list/belly_colorable_only_fullscreens = list("a_synth_flesh_mono",
 			unsaved_changes = TRUE
 			return TRUE
 		if("toggle_dropnom_pred")
-			host.can_be_drop_pred = !host.can_be_drop_pred
-			if(host.client.prefs_vr)
-				host.client.prefs_vr.can_be_drop_pred = host.can_be_drop_pred
-			unsaved_changes = TRUE
+			set_trustlist_preference_state("dropnom_pred") // RS Add: Trustlist integration (Lira, September 2025)
 			return TRUE
 		if("toggle_dropnom_prey")
-			host.can_be_drop_prey = !host.can_be_drop_prey
-			if(host.client.prefs_vr)
-				host.client.prefs_vr.can_be_drop_prey = host.can_be_drop_prey
-			unsaved_changes = TRUE
+			set_trustlist_preference_state("dropnom_prey") // RS Add: Trustlist integration (Lira, September 2025)
 			return TRUE
 		if("toggle_allow_inbelly_spawning")
 			host.allow_inbelly_spawning = !host.allow_inbelly_spawning
@@ -1225,10 +894,7 @@ var/global/list/belly_colorable_only_fullscreens = list("a_synth_flesh_mono",
 			unsaved_changes = TRUE
 			return TRUE
 		if("toggle_allow_spontaneous_tf")
-			host.allow_spontaneous_tf = !host.allow_spontaneous_tf
-			if(host.client.prefs_vr)
-				host.client.prefs_vr.allow_spontaneous_tf = host.allow_spontaneous_tf
-			unsaved_changes = TRUE
+			set_trustlist_preference_state("spontaneous_tf") // RS Add: Trustlist integration (Lira, September 2025)
 			return TRUE
 		if("toggle_digest")
 			host.digestable = !host.digestable
@@ -1249,10 +915,7 @@ var/global/list/belly_colorable_only_fullscreens = list("a_synth_flesh_mono",
 			unsaved_changes = TRUE
 			return TRUE
 		if("toggle_resize")
-			host.resizable = !host.resizable
-			if(host.client.prefs_vr)
-				host.client.prefs_vr.resizable = host.resizable
-			unsaved_changes = TRUE
+			set_trustlist_preference_state("resize") // RS Add: Trustlist integration (Lira, September 2025)
 			return TRUE
 		if("toggle_feed")
 			host.feeding = !host.feeding
@@ -1285,10 +948,7 @@ var/global/list/belly_colorable_only_fullscreens = list("a_synth_flesh_mono",
 			unsaved_changes = TRUE
 			return TRUE
 		if("toggle_pickuppref")
-			host.pickup_pref = !host.pickup_pref
-			if(host.client.prefs_vr)
-				host.client.prefs_vr.pickup_pref = host.pickup_pref
-			unsaved_changes = TRUE
+			set_trustlist_preference_state("pickup_pref") // RS Add: Trustlist integration (Lira, September 2025)
 			return TRUE
 		if("toggle_healbelly")
 			host.permit_healbelly = !host.permit_healbelly
@@ -1320,24 +980,60 @@ var/global/list/belly_colorable_only_fullscreens = list("a_synth_flesh_mono",
 		if("liq_set_messages")
 			return liq_set_msg(usr, params)
 		// End reagent bellies
-		if("toggle_drop_vore")
-			host.drop_vore = !host.drop_vore
+		if("toggle_autotransferable") //RS Add Start || Port Chomp 3200
+			host.autotransferable = !host.autotransferable
+			if(host.client.prefs_vr)
+				host.client.prefs_vr.autotransferable = host.autotransferable
 			unsaved_changes = TRUE
+			return TRUE //RS Add End
+		if("toggle_drop_vore")
+			set_trustlist_preference_state("drop_vore") // RS Add: Trustlist integration (Lira, September 2025)
 			return TRUE
 		if("toggle_slip_vore")
-			host.slip_vore = !host.slip_vore
-			unsaved_changes = TRUE
+			set_trustlist_preference_state("slip_vore") // RS Add: Trustlist integration (Lira, September 2025)
 			return TRUE
 		if("toggle_stumble_vore")
-			host.stumble_vore = !host.stumble_vore
-			unsaved_changes = TRUE
+			set_trustlist_preference_state("stumble_vore") // RS Add: Trustlist integration (Lira, September 2025)
+			return TRUE
+		// RS Add: Split from stumble (Lira, January 2026)
+		if("toggle_buckle_vore")
+			set_trustlist_preference_state("buckle_vore")
 			return TRUE
 		if("toggle_throw_vore")
-			host.throw_vore = !host.throw_vore
-			unsaved_changes = TRUE
+			set_trustlist_preference_state("throw_vore") // RS Add: Trustlist integration (Lira, September 2025)
 			return TRUE
 		if("toggle_food_vore")
-			host.food_vore = !host.food_vore
+			set_trustlist_preference_state("food_vore") // RS Add: Trustlist integration (Lira, September 2025)
+			return TRUE
+		// RS Add: New emote spont vore (Lira, February 2026)
+		if("toggle_emote_vore")
+			set_trustlist_preference_state("emote_vore")
+			return TRUE
+		// RS Add: Spont vore prefs (Lira, January 2026)
+		if("set_spont_belly_pref")
+			var/pref_id = params["pref"]
+			if(!(pref_id in spontaneous_belly_pref_keys))
+				return TRUE
+			if(!islist(host.spont_belly_prefs))
+				host.spont_belly_prefs = list()
+			var/default_label = "Default (Selected Belly)"
+			var/list/belly_choices = list(default_label)
+			for(var/obj/belly/B as anything in host.vore_organs)
+				belly_choices += B.name
+			var/current_choice = host.spont_belly_prefs[pref_id]
+			if(!current_choice)
+				current_choice = default_label
+			var/choice = tgui_input_list(usr, "Which belly should [pref_id] send prey to?", "Spontaneous Vore Belly", belly_choices, current_choice)
+			if(!choice)
+				return TRUE
+			if(choice == default_label)
+				host.spont_belly_prefs[pref_id] = null
+			else
+				host.spont_belly_prefs[pref_id] = choice
+			if(host.client && host.client.prefs_vr)
+				if(!islist(host.client.prefs_vr.spont_belly_prefs))
+					host.client.prefs_vr.spont_belly_prefs = list()
+				host.client.prefs_vr.spont_belly_prefs[pref_id] = host.spont_belly_prefs[pref_id]
 			unsaved_changes = TRUE
 			return TRUE
 		if("switch_selective_mode_pref")
@@ -1410,7 +1106,7 @@ var/global/list/belly_colorable_only_fullscreens = list("a_synth_flesh_mono",
 
 	var/intent = "Examine"
 	if(isliving(target))
-		intent = tgui_alert(usr, "What do you want to do to them?","Query",list("Examine","Help Out","Devour"))
+		intent = tgui_alert(usr, "What do you want to do to them?","Query",list("Examine","Healthbar","Help Out","Devour"))	//RS EDIT
 
 	else if(istype(target, /obj/item))
 		intent = tgui_alert(usr, "What do you want to do to that?","Query",list("Examine","Use Hand"))
@@ -1479,6 +1175,8 @@ var/global/list/belly_colorable_only_fullscreens = list("a_synth_flesh_mono",
 					M.absorbed = FALSE
 					OB.handle_absorb_langs(M, OB.owner)
 				TB.nom_mob(M)
+		if("Healthbar")			//RS ADD
+			new /obj/screen/movable/rs_ui/healthbar(user,target,user)	//RS ADD
 
 /datum/vore_look/proc/pick_from_outside(mob/user, params)
 	var/intent
@@ -1549,200 +1247,48 @@ var/global/list/belly_colorable_only_fullscreens = list("a_synth_flesh_mono",
 	var/atom/movable/target = locate(params["pick"])
 	if(!(target in host.vore_selected))
 		return TRUE // Not in our X anymore, update UI
-	var/list/available_options = list("Examine", "Eject", "Move", "Advance", "Transfer")
+	var/list/available_options = list("Examine", "Eject", "Move", "Advance", "Transfer")	//RS EDIT
 	if(ishuman(target))
 		available_options += "Transform"
 	if(isliving(target))
 		var/mob/living/datarget = target
+		available_options += "Health Bar"	//RS ADD
+		available_options += "Print Health Bar"	//RS ADD
 		if(datarget.client)
 			available_options += "Process"
 	intent = tgui_input_list(user, "What would you like to do with [target]?", "Vore Pick", available_options)
 	switch(intent)
-		if("Examine")
-			var/list/results = target.examine(host)
-			if(!results || !results.len)
-				results = list("You were unable to examine that. Tell a developer!")
-			to_chat(user, jointext(results, "<br>"))
-			if(isliving(target))
-				var/mob/living/ourtarget = target
-				ourtarget.chat_healthbar(user)
+		if("Examine")	//RS EDIT START - Generalized BABY
+			host.vore_selected.examine_target(target,user)
 			return TRUE
-
 		if("Eject")
-			if(host.stat)
-				to_chat(user,"<span class='warning'>You can't do that in your state!</span>")
-				return TRUE
-
-			host.vore_selected.release_specific_contents(target)
+			host.vore_selected.eject_target(target)
 			return TRUE
-
 		if("Move")
-			if(host.stat)
-				to_chat(user,"<span class='warning'>You can't do that in your state!</span>")
-				return TRUE
-			var/obj/belly/choice = tgui_input_list(usr, "Move [target] where?","Select Belly", host.vore_organs)
-			if(!choice || !(target in host.vore_selected))
-				return TRUE
-			to_chat(target,"<span class='warning'>You're squished from [host]'s [lowertext(host.vore_selected.name)] to their [lowertext(choice.name)]!</span>")
-			host.vore_selected.transfer_contents(target, choice)
-
-
+			host.vore_selected.move_target(target)
+			return TRUE
 		if("Transfer")
-			if(host.stat)
-				to_chat(user,"<span class='warning'>You can't do that in your state!</span>")
-				return TRUE
-			if(isliving(target))
-				var/mob/living/p = target
-				if(!p.ssd_vore_check(host))
-					return
-
-			var/mob/living/belly_owner = host
-
-			var/list/viable_candidates = list()
-			for(var/mob/living/candidate in range(1, host))
-				if(istype(candidate) && !(candidate == host))
-					if(candidate.vore_organs.len && candidate.feeding && !candidate.no_vore)
-						viable_candidates += candidate
-			if(!viable_candidates.len)
-				to_chat(user, "<span class='notice'>There are no viable candidates around you!</span>")
-				return TRUE
-			belly_owner = tgui_input_list(user, "Who do you want to receive the target?", "Select Predator", viable_candidates)
-
-			if(!belly_owner || !(belly_owner in range(1, host)))
-				return TRUE
-
-			var/obj/belly/choice = tgui_input_list(user, "Move [target] where?","Select Belly", belly_owner.vore_organs)
-			if(!choice || !(target in host.vore_selected) || !belly_owner || !(belly_owner in range(1, host)))
-				return TRUE
-
-			if(belly_owner != host)
-				to_chat(user, "<span class='notice'>Transfer offer sent. Await their response.</span>")
-				var/accepted = tgui_alert(belly_owner, "[host] is trying to transfer [target] from their [lowertext(host.vore_selected.name)] into your [lowertext(choice.name)]. Do you accept?", "Feeding Offer", list("Yes", "No"))
-				if(accepted != "Yes")
-					to_chat(user, "<span class='warning'>[belly_owner] refused the transfer!!</span>")
-					return TRUE
-				if(!belly_owner || !(belly_owner in range(1, host)))
-					return TRUE
-				to_chat(target,"<span class='warning'>You're squished from [host]'s [lowertext(host.vore_selected.name)] to [belly_owner]'s [lowertext(choice.name)]!</span>")
-				to_chat(belly_owner,"<span class='warning'>[target] is squished from [host]'s [lowertext(host.vore_selected.name)] to your [lowertext(choice.name)]!</span>")
-				host.vore_selected.transfer_contents(target, choice)
-			else
-				to_chat(target,"<span class='warning'>You're squished from [host]'s [lowertext(host.vore_selected.name)] to their [lowertext(choice.name)]!</span>")
-				host.vore_selected.transfer_contents(target, choice)
+			host.vore_selected.transfer_target(target)
 			return TRUE
-
 		if("Transform")
-			if(host.stat)
-				to_chat(user,"<span class='warning'>You can't do that in your state!</span>")
-				return TRUE
-
-			var/mob/living/carbon/human/H = target
-			if(!istype(H))
-				return
-
-			var/datum/tgui_module/appearance_changer/vore/V = new(host, H)
-			V.tgui_interact(user)
+			host.vore_selected.transform_target(target)
 			return TRUE
-
 		if("Process")
-			var/mob/living/ourtarget = target
-			var/list/process_options = list()
-
-			if(ourtarget.digestable)
-				process_options += "Digest"
-
-			if(ourtarget.absorbable)
-				process_options += "Absorb"
-
-			process_options += "Knockout" //Can't think of any mechanical prefs that would restrict this. // RS Edit || Ports VOREStation PR15876
-
-			if(process_options.len)
-				process_options += "Cancel"
-
-			else
-				to_chat(usr, "<span class= 'warning'>You cannot instantly process [ourtarget].</span>")
-				return
-
-			var/ourchoice = tgui_input_list(usr, "How would you prefer to process \the [target]? This will perform the given action instantly if the prey accepts.","Instant Process", process_options)
-			if(!ourchoice)
-				return
-			if(!ourtarget.client)
-				to_chat(usr, "<span class= 'warning'>You cannot instantly process [ourtarget].</span>")
-				return
-			var/obj/belly/b = ourtarget.loc
-			switch(ourchoice)
-				if("Digest")
-					if(ourtarget.absorbed)
-						to_chat(usr, "<span class= 'warning'>\The [ourtarget] is absorbed, and cannot presently be digested.</span>")
-						return
-					if(tgui_alert(ourtarget, "\The [usr] is attempting to instantly digest you. Is this something you are okay with happening to you?","Instant Digest", list("No", "Yes")) != "Yes")
-						to_chat(usr, "<span class= 'warning'>\The [ourtarget] declined your digest attempt.</span>")
-						to_chat(ourtarget, "<span class= 'warning'>You declined the digest attempt.</span>")
-						return
-					if(ourtarget.loc != b)
-						to_chat(usr, "<span class= 'warning'>\The [ourtarget] is no longer in \the [b].</span>")
-						return
-					if(isliving(usr))
-						var/mob/living/l = usr
-						var/thismuch = ourtarget.health + 100
-						if(ishuman(l))
-							var/mob/living/carbon/human/h = l
-							thismuch = thismuch * h.species.digestion_nutrition_modifier
-						l.adjust_nutrition(thismuch)
-					ourtarget.mind?.vore_death = TRUE
-					ourtarget.death()		// To make sure all on-death procs get properly called
-					if(ourtarget) //RS Edit start || Ports CHOMPStation 7158
-						if(ourtarget.is_preference_enabled(/datum/client_preference/digestion_noises))
-							SEND_SOUND(ourtarget, sound(get_sfx("fancy_death_prey")))
-						b.handle_digestion_death(ourtarget) // RS Edit end
-				if("Absorb")
-					if(tgui_alert(ourtarget, "\The [usr] is attempting to instantly absorb you. Is this something you are okay with happening to you?","Instant Absorb", list("No", "Yes")) != "Yes")
-						to_chat(usr, "<span class= 'warning'>\The [ourtarget] declined your absorb attempt.</span>")
-						to_chat(ourtarget, "<span class= 'warning'>You declined the absorb attempt.</span>")
-						return
-					if(ourtarget.loc != b)
-						to_chat(usr, "<span class= 'warning'>\The [ourtarget] is no longer in \the [b].</span>")
-						return
-					if(isliving(usr))
-						var/mob/living/l = usr
-						l.adjust_nutrition(ourtarget.nutrition)
-						var/n = 0 - ourtarget.nutrition
-						ourtarget.adjust_nutrition(n)
-					b.absorb_living(ourtarget)
-				//RS Edit || Ports VOREStation PR15876
-				if("Knockout")
-					if(tgui_alert(ourtarget, "\The [usr] is attempting to instantly make you unconscious, you will be unable until ejected from the pred. Is this something you are okay with happening to you?","Instant Knockout", list("No", "Yes")) != "Yes")
-						to_chat(usr, "<span class= 'vwarning'>\The [ourtarget] declined your knockout attempt.</span>")
-						to_chat(ourtarget, "<span class= 'vwarning'>You declined the knockout attempt.</span>")
-						return
-					if(ourtarget.loc != b)
-						to_chat(usr, "<span class= 'vwarning'>\The [ourtarget] is no longer in \the [b].</span>")
-						return
-					ourtarget.AdjustSleeping(500000)
-					to_chat(ourtarget, "<span class= 'vwarning'>\The [usr] has put you to sleep, you will remain unconscious until ejected from the belly.</span>")
-				if("Cancel")
-					return
-				//RS Edit || Ports VOREStation PR15876
-		//RS ADD START
+			host.vore_selected.process_target(target)
+			return TRUE
 		if("Advance")
-			if(host.stat)
-				to_chat(user,"<span class='warning'>You can't do that in your state!</span>")
-				return TRUE
-			var/list/choices = list()
-			var/obj/belly/choice
-			for(var/obj/belly/b in host.vore_organs)
-				if(b.name == host.vore_selected.transferlocation || b.name == host.vore_selected.transferlocation_secondary)
-					choices += b
-			if(!choices.len)
-				to_chat(user,"<span class='warning'>You haven't configured any transfer locations for your [lowertext(host.vore_selected)]. Please configure at least one transfer location in order to advance your [lowertext(host.vore_selected)]'s contents.</span>")
-			else
-				choice = tgui_input_list(user, "Advance your [lowertext(host.vore_selected)]'s contents to which belly?","Select Belly", choices)
-
-			if(!choice || !(target in host.vore_selected))
-				return TRUE
-			to_chat(target,"<span class='warning'>You're squished from [host]'s [lowertext(host.vore_selected.name)] to their [lowertext(choice.name)]!</span>")
-			host.vore_selected.transfer_contents(target, choice)
-		//RS ADD END
+			host.vore_selected.advance_target(target)
+			return TRUE
+		if("Health Bar")
+			if(isliving(target))
+				host.vore_selected.healthbar_target(target)
+			return TRUE
+		if("Print Health Bar")
+			if(isliving(target))
+				var/mob/living/L = target
+				L.chat_healthbar(host)
+			return TRUE
+		//RS EDIT END
 
 /datum/vore_look/proc/set_attr(mob/user, params)
 	if(!host.vore_selected)
@@ -2298,6 +1844,52 @@ var/global/list/belly_colorable_only_fullscreens = list("a_synth_flesh_mono",
 			if(!isnull(digest_chance_input))
 				host.vore_selected.digestchance = sanitize_integer(digest_chance_input, 0, 100, initial(host.vore_selected.digestchance))
 			. = TRUE
+		if("b_autotransferchance") //RS Add Start || Port Chomp 2821, 2934, 6155
+			var/autotransferchance_input = input(user, "Set belly auto-transfer chance (as %). You must also set the location for this to have any effect.", "Auto-Transfer Chance") as num|null
+			if(!isnull(autotransferchance_input))
+				host.vore_selected.autotransferchance = sanitize_integer(autotransferchance_input, 0, 100, initial(host.vore_selected.autotransferchance))
+			. = TRUE
+		if("b_autotransferwait")
+			var/autotransferwait_input = input(user, "Set minimum number of seconds for auto-transfer wait delay.", "Auto-Transfer Time") as num|null //Wiggle room for rougher time resolution in process cycles.
+			if(!isnull(autotransferwait_input))
+				host.vore_selected.autotransferwait = sanitize_integer(autotransferwait_input*10, 10, 18000, initial(host.vore_selected.autotransferwait))
+			. = TRUE
+		if("b_autotransferlocation")
+			var/obj/belly/choice = tgui_input_list(usr, "Where do you want your [lowertext(host.vore_selected.name)] auto-transfer to?","Select Belly", (host.vore_organs + "None - Remove" - host.vore_selected))
+			if(!choice) //They cancelled, no changes
+				return FALSE
+			else if(choice == "None - Remove")
+				host.vore_selected.autotransferlocation = null
+			else
+				host.vore_selected.autotransferlocation = choice.name
+			. = TRUE
+		if("b_autotransferchance_secondary")
+			var/autotransferchance_secondary_input = input(user, "Set secondary belly auto-transfer chance (as %). You must also set the location for this to have any effect.", "Secondary Auto-Transfer Chance") as num|null
+			if(!isnull(autotransferchance_secondary_input))
+				host.vore_selected.autotransferchance_secondary = sanitize_integer(autotransferchance_secondary_input, 0, 100, initial(host.vore_selected.autotransferchance_secondary))
+			. = TRUE
+		if("b_autotransferlocation_secondary")
+			var/obj/belly/choice = tgui_input_list(usr, "Where do you want your secondary [lowertext(host.vore_selected.name)] auto-transfer to?","Select Belly", (host.vore_organs + "None - Remove" - host.vore_selected))
+			if(!choice) //They cancelled, no changes
+				return FALSE
+			else if(choice == "None - Remove")
+				host.vore_selected.autotransferlocation_secondary = null
+			else
+				host.vore_selected.autotransferlocation_secondary = choice.name
+			. = TRUE
+		if("b_autotransfer_min_amount")
+			var/autotransfer_min_amount_input = input(user, "Set the minimum amount of items your belly can belly auto-transfer at once. Set to 0 for no limit.", "Auto-Transfer Min Amount") as num|null
+			if(!isnull(autotransfer_min_amount_input))
+				host.vore_selected.autotransfer_min_amount = sanitize_integer(autotransfer_min_amount_input, 0, 100, initial(host.vore_selected.autotransfer_min_amount))
+			. = TRUE
+		if("b_autotransfer_max_amount")
+			var/autotransfer_max_amount_input = input(user, "Set the maximum amount of items your belly can belly auto-transfer at once. Set to 0 for no limit.", "Auto-Transfer Max Amount") as num|null
+			if(!isnull(autotransfer_max_amount_input))
+				host.vore_selected.autotransfer_max_amount = sanitize_integer(autotransfer_max_amount_input, 0, 100, initial(host.vore_selected.autotransfer_max_amount))
+			. = TRUE
+		if("b_autotransfer_enabled")
+			host.vore_selected.autotransfer_enabled = !host.vore_selected.autotransfer_enabled
+			. = TRUE //RS Add End
 		if("b_fullscreen")
 			host.vore_selected.belly_fullscreen = params["val"]
 			. = TRUE
@@ -2314,6 +1906,59 @@ var/global/list/belly_colorable_only_fullscreens = list("a_synth_flesh_mono",
 		if("b_clear_preview")
 			host.vore_selected.clear_preview(host) //Clears the stomach overlay. This is a failsafe but shouldn't occur.
 			. = TRUE
+		// RS Add Start:  Add RSUI healthbars to vore panel (Lira, October 2025)
+		if("b_healthbar_theme")
+			var/list/options = rsui_healthbar_overlay_themes.Copy()
+			options += "Remove"
+			var/default_choice = host.vore_selected.belly_healthbar_overlay_theme
+			var/selection = tgui_input_list(usr, "Select a style! Remember to go save your vore panel after you select one if you want it to stick!", "RS-UI Customization", options, default_choice)
+			if(!selection)
+				return FALSE
+			if(selection == "Remove")
+				selection = null
+			if(host.vore_selected.belly_healthbar_overlay_theme == selection)
+				return FALSE
+			host.vore_selected.belly_healthbar_overlay_theme = selection
+			if(!selection)
+				host.vore_selected.belly_healthbar_overlay_color = null
+			. = TRUE
+		if("b_healthbar_theme_set")
+			var/theme = params["theme"]
+			if(!theme)
+				return FALSE
+			if(!istext(theme))
+				return FALSE
+			if(!(theme in rsui_healthbar_overlay_themes))
+				return FALSE
+			if(host.vore_selected.belly_healthbar_overlay_theme == theme)
+				return FALSE
+			host.vore_selected.belly_healthbar_overlay_theme = theme
+			. = TRUE
+		if("b_healthbar_theme_clear")
+			if(isnull(host.vore_selected.belly_healthbar_overlay_theme))
+				return FALSE
+			host.vore_selected.belly_healthbar_overlay_theme = null
+			host.vore_selected.belly_healthbar_overlay_color = null
+			. = TRUE
+		if("b_healthbar_color")
+			if(!host.vore_selected.belly_healthbar_overlay_theme)
+				return FALSE
+			var/current_color = host.vore_selected.belly_healthbar_overlay_color
+			var/newcolor = input(usr, "Choose an RS-UI overlay color.", "RS-UI Coloration", current_color) as color|null
+			if(!newcolor)
+				return FALSE
+			if(current_color == newcolor)
+				return FALSE
+			host.vore_selected.belly_healthbar_overlay_color = newcolor
+			. = TRUE
+		if("b_healthbar_color_clear")
+			if(!host.vore_selected.belly_healthbar_overlay_theme)
+				return FALSE
+			if(isnull(host.vore_selected.belly_healthbar_overlay_color))
+				return FALSE
+			host.vore_selected.belly_healthbar_overlay_color = null
+			. = TRUE
+		// RS Add End
 		if("b_fullscreen_color")
 			var/newcolor = input(usr, "Choose a color.", "", host.vore_selected.belly_fullscreen_color) as color|null
 			if(newcolor)
@@ -2331,6 +1976,10 @@ var/global/list/belly_colorable_only_fullscreens = list("a_synth_flesh_mono",
 			. = TRUE
 		if("b_save_digest_mode")
 			host.vore_selected.save_digest_mode = !host.vore_selected.save_digest_mode
+			. = TRUE
+		// RS Add: Allow external feeding option (Lira, January 2026)
+		if("b_allow_external_feeding")
+			host.vore_selected.allow_external_feeding = !host.vore_selected.allow_external_feeding
 			. = TRUE
 		if("b_del")
 			var/alert = tgui_alert(usr, "Are you sure you want to delete your [lowertext(host.vore_selected.name)]?","Confirmation",list("Cancel","Delete"))

@@ -13,6 +13,7 @@
 	. = ..()
 	verbs |= /mob/living/simple_mob/proc/set_name
 	verbs |= /mob/living/simple_mob/proc/set_desc
+	verbs |= /mob/living/simple_mob/proc/set_gender //RS Add - Make a set gender button for simplemobs
 
 	if(copy_prefs_to_mob)
 		login_prefs()
@@ -41,7 +42,9 @@
 
 	drop_vore = client.prefs_vr.drop_vore
 	stumble_vore = client.prefs_vr.stumble_vore
+	buckle_vore = client.prefs_vr.buckle_vore // RS Add: Split from stumble vore (Lira, January 2026)
 	slip_vore = client.prefs_vr.slip_vore
+	spont_belly_prefs = islist(client.prefs_vr.spont_belly_prefs) ? client.prefs_vr.spont_belly_prefs.Copy() : list() // RS Add: Spont prefs (Lira, January 2026)
 
 	resizable = client.prefs_vr.resizable
 	show_vore_fx = client.prefs_vr.show_vore_fx
@@ -127,4 +130,12 @@
 	allow_contaminate = client.prefs_vr.allow_contaminate
 	to_chat(src, "<span class='notice'>Contamination is now [allow_contaminate ? "<font color='green'>allowed</font>" : "<font color='red'>disallowed</font>"].</span>")
 
+/mob/living/simple_mob/proc/set_gender()
+	set name = "Set Gender"
+	set desc = "Set your gender."
+	set category = "Abilities"
+
+	var/new_gender = tgui_input_list(usr, "Please select a gender:", "Set Gender", list(FEMALE, MALE, NEUTER, PLURAL))
+	if(new_gender)
+		src.gender = new_gender
 //RS ADD END

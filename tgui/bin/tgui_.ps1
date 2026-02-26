@@ -59,7 +59,8 @@ function task-prettier {
 }
 
 function task-prettify {
-  yarn prettierx --write packages @Args
+  ## RS Edit - use prettier
+  yarn prettier --write packages @Args
 }
 
 ## Run a linter through all packages
@@ -120,7 +121,7 @@ if ($Args.Length -gt 0) {
   if ($Args[0] -eq "--lint-harder") {
     $Rest = $Args | Select-Object -Skip 1
     task-install
-    task-lint -c ".eslintrc-harder.yml" @Rest
+    task-lint -c "eslintrc-harder.config.mjs" @Rest  # RS Edit: New ESLint
     exit 0
   }
 

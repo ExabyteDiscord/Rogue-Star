@@ -1118,15 +1118,15 @@ var/global/list/common_tools = list(
 
 // check if mob is lying down on something we can operate him on.
 // The RNG with table/rollerbeds comes into play in do_surgery() so that fail_step() can be used instead.
-/proc/can_operate(mob/living/carbon/M, mob/living/user)
-	. = M.lying
-
-	if(user && M == user && user.allow_self_surgery && user.a_intent == I_HELP)	// You can, technically, always operate on yourself after standing still. Inadvised, but you can.
-
-		if(!M.isSynthetic())
-			. = TRUE
-
+/proc/can_operate(mob/living/carbon/M, mob/living/user) //RS Edit, proc was returning true while target lying down, regardless of anything else.
+	. = FALSE //RS EDIT, formerly returned true while lying down, and skipped below checks.
+	if(user && user.a_intent == I_HELP && M.lying)
+		//if(!M.isSynthetic()) //RS remove, its an admin given only verb, why limit to only organics?
+		. = TRUE
+		if(!(user.allow_self_surgery) && M == user)
+			. = FALSE
 	return .
+	//RS Edit End
 
 // Returns an instance of a valid surgery surface.
 /mob/living/proc/get_surgery_surface(mob/living/user)
@@ -1264,15 +1264,29 @@ var/mob/dview/dview_mob = new
 	global.dview_mob = new
 	return ..()
 
-/proc/screen_loc2turf(scr_loc, turf/origin)
+// RS Edit: Nearby Transparency Toggle Support (Lira, February 2026)
+/proc/screen_loc2turf(scr_loc, turf/origin, mob/viewer = null)
+	if(!scr_loc || !origin)
+		return null
+
+	var/origin_x = origin.x
+	var/origin_y = origin.y
+	// Account for camera look offsets (e.g. look-over-there) so screen-loc maps to the viewed area.
+	if(viewer?.client)
+		origin_x += round(viewer.client.pixel_x / world.icon_size)
+		origin_y += round(viewer.client.pixel_y / world.icon_size)
+
 	var/tX = splittext(scr_loc, ",")
 	var/tY = splittext(tX[2], ":")
 	var/tZ = origin.z
+	var/list/view_size = viewer?.client ? getviewsize(viewer.client.view) : getviewsize(world.view)
+	var/view_center_x = CEILING((view_size[1] + 1) / 2, 1)
+	var/view_center_y = CEILING((view_size[2] + 1) / 2, 1)
 	tY = tY[1]
 	tX = splittext(tX[1], ":")
 	tX = tX[1]
-	tX = max(1, min(world.maxx, origin.x + (text2num(tX) - (world.view + 1))))
-	tY = max(1, min(world.maxy, origin.y + (text2num(tY) - (world.view + 1))))
+	tX = max(1, min(world.maxx, origin_x + (text2num(tX) - view_center_x)))
+	tY = max(1, min(world.maxy, origin_y + (text2num(tY) - view_center_y)))
 	return locate(tX, tY, tZ)
 
 // Displays something as commonly used (non-submultiples) SI units.
@@ -1501,6 +1515,7 @@ GLOBAL_REAL_VAR(list/stack_trace_storage)
 
 	. += new /obj/screen/plane_master{plane = PLANE_MESONS} 			//Meson-specific things like open ceilings.
 	. += new /obj/screen/plane_master{plane = PLANE_BUILDMODE}			//Things that only show up while in build mode
+	. += new /obj/screen/plane_master{plane = PLANE_ADMIN_SECRET}		//RS ADD - Things that only show up if you're an admin who is peeking secrets
 
 	// Real tangible stuff planes
 	. += new /obj/screen/plane_master/main{plane = TURF_PLANE}

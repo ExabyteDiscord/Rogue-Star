@@ -115,7 +115,6 @@
 	var/stunned = 0.0
 	var/weakened = 0.0
 	var/losebreath = 0.0//Carbon
-	var/shakecamera = 0
 	var/a_intent = I_HELP//Living
 	var/m_int = null//Living
 	var/m_intent = "run"//Living
@@ -221,6 +220,11 @@
 	var/obj/effect/decal/typing_indicator
 	var/obj/effect/decal/typing_indicator_active
 	var/cur_typing_indicator
+	// RS Add Start: Support for typing indicator enhancement (Lira, October 2025)
+	var/tmp/input_typing_focus = FALSE
+	var/tmp/input_typing_indicator_active = FALSE
+	var/tmp/input_typing_timer_id
+	// RS Add End
 	var/custom_speech_bubble = "default"
 
 	var/low_priority = FALSE //Skip processing life() if there's just no players on this Z-level

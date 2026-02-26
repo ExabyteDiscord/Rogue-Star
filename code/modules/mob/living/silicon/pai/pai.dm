@@ -111,6 +111,9 @@
 
 	var/our_icon_rotation = 0
 
+	var/datum/tgui_module/pai_chassis_selector/chassis_selector_ui //RS Add: pAI chassis selector UI update (Lira, October 2025)
+	var/list/chassis_preview_cache //RS Add: pAI chassis selector UI update (Lira, October 2025)
+
 /mob/living/silicon/pai/New(var/obj/item/device/paicard)
 	src.loc = paicard
 	card = paicard
@@ -143,6 +146,8 @@
 		if(M)
 			M.toff = FALSE
 	..()
+	chassis_selector_ui = new(src) //RS Add: pAI chassis selector UI update (Lira, October 2025)
+	chassis_preview_cache = list() //RS Add: pAI chassis selector UI update (Lira, October 2025)
 
 /mob/living/silicon/pai/Login()
 	..()
@@ -184,6 +189,10 @@
 		// 33% chance to unbind
 		// 33% chance to change prime directive (based on severity)
 		// 33% chance of no additional effect
+
+	if(severity == 5)	//RS ADD START - allow for certain very light EMP to be harmless - shadekin related
+		to_chat(src, SPAN_WARNING("Your circuits feel SPICY!!! Whatever you are doing feels dangerous!"))
+		return			//RS ADD END
 
 	src.silence_time = world.timeofday + 120 * 10		// Silence for 2 minutes
 	to_chat(src, "<font color=green><b>Communication circuit overload. Shutting down and reloading communication circuits - speech and messaging functionality will be unavailable until the reboot is complete.</b></font>")
@@ -427,6 +436,9 @@
 
 /mob/living/silicon/pai/attack_hand(mob/user as mob)
 	if(user.a_intent == I_HELP)
+		if(isliving(user))	//RS ADD START
+			var/mob/living/L = user
+			L.game_tag(src)	//RS ADD END
 		visible_message("<span class='notice'>[user.name] pats [src].</span>")
 	else
 		visible_message("<span class='danger'>[user.name] boops [src] on the head.</span>")
@@ -537,11 +549,59 @@
 	set category = "pAI Commands"
 	set desc = "Upload your personality to the cloud and wipe your software from the card. This is functionally equivalent to cryo or robotic storage, freeing up your job slot."
 
+	// RS Add Start: Off duty AI support (Lira, November 2025)
+
+	var/is_offduty = istype(src, /mob/living/silicon/pai/ai_offduty)
+	var/mob/living/silicon/pai/ai_offduty/offduty = is_offduty ? src : null
+
+	if(offduty)
+		if(!offduty.stored_core || QDELETED(offduty.stored_core))
+			to_chat(src, span("warning", "Your AI core is missing; unable to enter storage."))
+			return
+
+		var/turf/core_turf = get_turf(offduty.stored_core)
+		if(!core_turf || get_dist(src, core_turf) > 1)
+			to_chat(src, span("warning", "You must be adjacent to your AI core to enter storage."))
+			return
+
+	// RS Add End
+
 	// Make sure people don't kill themselves accidentally
 	if(tgui_alert(usr, "WARNING: This will immediately wipe your software and ghost you, removing your character from the round permanently (similar to cryo and robotic storage). Are you entirely sure you want to do this?", "Wipe Software", list("No", "Yes")) != "Yes")
 		return
 
+	// RS Add: Off duty AI support (Lira, November 2025)
+	if(offduty && offduty.stored_core && !QDELETED(offduty.stored_core))
+		var/mob/living/silicon/ai/core = offduty.stored_core
+		var/turf/core_turf = get_turf(core)
+		core.close_off_duty_core_slot()
+		if(global_announcer)
+			global_announcer.autosay("[core] has been moved to intelligence storage.", "Artificial Intelligence Oversight")
+		if(core_turf)
+			empty_playable_ai_cores += new /obj/structure/AIcore/deactivated(core_turf)
+		QDEL_NULL(offduty.stored_core)
+
 	close_up()
-	visible_message("<span class='filter_notice'><b>[src]</b> fades away from the screen, the pAI device goes silent.</span>")
 	card.removePersonality()
+
+	// RS Add Start: Off duty AI support (Lira, November 2025)
+	if(offduty)
+		visible_message("<span class='filter_notice'><b>[src]</b> is stored back into their AI core.</span>")
+	else
+		visible_message("<span class='filter_notice'><b>[src]</b> fades away from the screen, the pAI device goes silent.</span>")
+	// RS Add End
+
 	clear_client()
+
+	// RS Add: Off duty AI support (Lira, November 2025)
+	if(offduty)
+		qdel(src)
+
+/mob/living/silicon/pai/ClickOn(atom/A, params) //RS ADD START
+	. = ..()
+
+	if(!isturf(src.loc))
+		return
+	if(isliving(A))
+		var/mob/living/L = A
+		game_tag(L)	//RS ADD END - The pai is clicking someone else!

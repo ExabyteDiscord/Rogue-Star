@@ -11,6 +11,8 @@
 	var/feral = 0 						// How feral the mob is, if at all. Does nothing for non xenochimera at the moment.
 	var/revive_ready = REVIVING_READY	// Only used for creatures that have the xenochimera regen ability, so far.
 	var/revive_finished = 0				// Only used for xenochimera regen, allows us to find out when the regen will finish.
+	var/chimera_expected_real_name		// RS Add: Tracks the expected character identity during xenochimera regeneration (Lira, October 2025)
+	var/chimera_expected_species		// RS Add: Tracks the expected species string during xenochimera regeneration (Lira, October 2025)
 	var/metabolism = 0.0015
 	var/no_vore = FALSE					// If the character/mob can vore.
 	var/restrict_vore_ventcrawl = FALSE // Self explanatory
@@ -258,6 +260,9 @@
 	P.throw_vore = src.throw_vore
 	P.food_vore = src.food_vore
 	P.stumble_vore = src.stumble_vore
+	P.buckle_vore = src.buckle_vore // RS Add: Split from stumble (Lira, January 2026)
+	P.emote_vore = src.emote_vore // RS Add: New emote spont vore (Lira, February 2026)
+	P.spont_belly_prefs = islist(src.spont_belly_prefs) ? src.spont_belly_prefs.Copy() : list() // RS Add: Spont belly prefs (Lira, January 2026)
 	P.glowy_belly = src.glowy_belly
 	P.eating_privacy_global = src.eating_privacy_global
 
@@ -265,6 +270,8 @@
 	P.nutrition_messages = src.nutrition_messages
 	P.weight_message_visible = src.weight_message_visible
 	P.weight_messages = src.weight_messages
+
+	P.autotransferable = src.autotransferable //RS Add || Chomp Port 3200
 
 	P.vore_sprite_color = istype(src, /mob/living/carbon/human) ? src:vore_sprite_color : null //RS edit
 	if(isliving(src))
@@ -312,14 +319,19 @@
 	slip_vore = P.slip_vore
 	throw_vore = P.throw_vore
 	stumble_vore = P.stumble_vore
+	buckle_vore = P.buckle_vore // RS Add: Split from stumble (Lira, January 2026)
 	glowy_belly = P.glowy_belly
 	food_vore = P.food_vore
+	emote_vore = P.emote_vore // RS Add: New emote spont vore (Lira, February 2026)
+	spont_belly_prefs = islist(P.spont_belly_prefs) ? P.spont_belly_prefs.Copy() : list() // RS Add: Spont belly prefs (Lira, January 2026)
 	eating_privacy_global = P.eating_privacy_global
 
 	nutrition_message_visible = P.nutrition_message_visible
 	nutrition_messages = P.nutrition_messages
 	weight_message_visible = P.weight_message_visible
 	weight_messages = P.weight_messages
+
+	autotransferable = P.autotransferable //RS Add || Chomp Port 3200
 
 	if (istype(src, /mob/living/carbon/human)) //RS edit
 		src:vore_sprite_color = P.vore_sprite_color //RS edit
@@ -386,7 +398,7 @@
 //
 // Clearly super important. Obviously.
 //
-/mob/living/proc/lick(mob/living/tasted in living_mobs(1,TRUE))	//RS EDIT
+/mob/living/proc/lick(mob/living/tasted in living_mobs_in_view(1, TRUE)) //RS Add Chomp port #7484 | no cross dimensional licking
 	set name = "Lick"
 	set category = "IC"
 	set desc = "Lick someone nearby!"
@@ -427,19 +439,23 @@
 
 
 //This is just the above proc but switched about.
-/mob/living/proc/smell(mob/living/smelled in living_mobs(1, TRUE))	//RS EDIT
+/mob/living/proc/smell(mob/living/smelled  in living_mobs_in_view(1, TRUE)) //RS Add Chomp port #7484 | no cross dimensional Sniffing <- I kinda like the sniffing tho it funny
 	set name = "Smell"
 	set category = "IC"
 	set desc = "Smell someone nearby!"
 	set popup_menu = FALSE
 
-	if(!istype(smelled))
+	if(!istype(smelled) || smelled == src)	//RS EDIT - Don't smell yourself
 		return
 	if(!checkClickCooldown() || incapacitated(INCAPACITATION_ALL))
 		return
 
 	setClickCooldown(DEFAULT_ATTACK_COOLDOWN)
 	visible_message("<span class='warning'>[src] smells [smelled]!</span>","<span class='notice'>You smell [smelled]. They smell like [smelled.get_smell_message()].</span>","<b>Sniff!</b>")
+
+	if(olfaction_track)	//RS ADD START
+		SEND_SIGNAL(src,COMSIG_MOB_SMELLED)
+		add_modifier(/datum/modifier/olfaction_track, origin = smelled)	//RS ADD END
 
 /mob/living/proc/get_smell_message(allow_generic = 1)
 	if(!vore_smell && !allow_generic)
@@ -547,6 +563,115 @@
 //
 // Eating procs depending on who clicked what
 //
+
+// RS Add: Use spont belly (Lira, January 2026)
+/mob/living/proc/get_spontaneous_belly(var/preftype, var/fallback_preftype)
+	if(!preftype || !islist(spont_belly_prefs))
+		return vore_selected
+	var/desired_name = spont_belly_prefs[preftype]
+	if(!desired_name && fallback_preftype)
+		desired_name = spont_belly_prefs[fallback_preftype]
+	if(!desired_name)
+		return vore_selected
+	for(var/obj/belly/B as anything in vore_organs)
+		if(B.name == desired_name)
+			return B
+	return vore_selected
+
+// RS Add Start: New emote spont vore (Lira, February 2026)
+/mob/living/proc/get_emote_vore_candidates()
+	var/list/candidate_map = list()
+
+	for(var/mob/living/L in range(1, src))
+		if(L != src)
+			candidate_map[L] = TRUE
+
+	for(var/obj/item/I in list(l_hand, r_hand))
+		if(!istype(I, /obj/item/weapon/holder))
+			continue
+		var/obj/item/weapon/holder/H = I
+		for(var/mob/living/L in H.contents)
+			if(L != src)
+				candidate_map[L] = TRUE
+
+	var/obj/item/weapon/holder/current_holder = get_holder_of_type(src, /obj/item/weapon/holder)
+	if(current_holder && istype(current_holder.loc, /mob/living))
+		var/mob/living/holder_mob = current_holder.loc
+		if(holder_mob != src)
+			candidate_map[holder_mob] = TRUE
+
+	var/list/candidates = list()
+	for(var/mob/living/L as anything in candidate_map)
+		candidates += L
+	return candidates
+
+/mob/living/proc/try_emote_vore_pred_mode()
+	var/list/candidates = get_emote_vore_candidates()
+	if(!candidates.len)
+		return FALSE
+
+	var/obj/belly/belly = get_spontaneous_belly(EMOTE_VORE)
+	if(!istype(belly))
+		return FALSE
+
+	var/did_anything = FALSE
+	for(var/mob/living/prey in candidates)
+		if(!spont_pref_check(src, prey, EMOTE_VORE))
+			continue
+		var/obj/item/weapon/holder/current_holder = get_holder_of_type(src, /obj/item/weapon/holder)
+		if(current_holder)
+			var/mob/living/holding_mob = get_holder_of_type(current_holder, /mob/living)
+			if(holding_mob == prey)
+				current_holder.dump_mob()
+		if(perform_the_nom(src, prey, src, belly, delay = 1))
+			did_anything = TRUE
+	return did_anything
+
+/mob/living/proc/try_emote_vore_prey_mode()
+	var/list/candidates = get_emote_vore_candidates()
+	if(!candidates.len)
+		return FALSE
+
+	var/list/valid_preds = list()
+	for(var/mob/living/pred in candidates)
+		if(!spont_pref_check(pred, src, EMOTE_VORE))
+			continue
+		var/obj/belly/belly = pred.get_spontaneous_belly(EMOTE_VORE)
+		if(!istype(belly))
+			continue
+		valid_preds += pred
+
+	if(!valid_preds.len)
+		return FALSE
+
+	var/mob/living/chosen_pred = pick(valid_preds)
+	if(!istype(chosen_pred))
+		return FALSE
+
+	var/obj/belly/target_belly = chosen_pred.get_spontaneous_belly(EMOTE_VORE)
+	if(!istype(target_belly))
+		return FALSE
+
+	return perform_the_nom(src, src, chosen_pred, target_belly, delay = 1)
+
+/mob/living/proc/handle_emote_vore_mode(var/mode)
+	mode = sanitize_unified_say_emote_vore_mode(mode)
+	switch(mode)
+		if("pred")
+			return try_emote_vore_pred_mode()
+		if("prey")
+			return try_emote_vore_prey_mode()
+	return FALSE
+// RS Add End
+
+// RS Add: Allow external feeding option (Lira, January 2026)
+/mob/living/proc/get_external_feeding_bellies()
+	var/list/choices = list()
+	for(var/obj/belly/B as anything in vore_organs)
+		if(B.allow_external_feeding)
+			choices += B
+	return choices
+
 /mob/living/proc/feed_grabbed_to_self(mob/living/user, mob/living/prey)
 	var/belly = user.vore_selected
 	return perform_the_nom(user, prey, user, belly)
@@ -556,7 +681,13 @@
 	if(user != pred)
 		if(!pred.ssd_vore_check(user))	//RS ADD
 			return FALSE				//RS ADD
-		belly = tgui_input_list(usr, "Choose Belly", "Belly Choice", pred.vore_organs)
+		// RS Edit Start: Allow external feeding option (Lira, January 2026)
+		var/list/belly_choices = pred.get_external_feeding_bellies()
+		if(!LAZYLEN(belly_choices))
+			to_chat(user, "<span class='warning'>[pred] doesn't have any bellies available for external feeding.</span>")
+			return FALSE
+		belly = tgui_input_list(usr, "Choose Belly", "Belly Choice", belly_choices)
+		// RS Edit End
 	else
 		if(!prey.ssd_vore_check(user))	//RS ADD
 			return FALSE				//RS ADD
@@ -566,7 +697,13 @@
 /mob/living/proc/feed_self_to_grabbed(mob/living/user, mob/living/pred)
 	if(!pred.ssd_vore_check(user))	//RS ADD
 		return FALSE				//RS ADD
-	var/belly = tgui_input_list(usr, "Choose Belly", "Belly Choice", pred.vore_organs)
+	// RS Edit Start: Allow external feeding option (Lira, January 2026)
+	var/list/belly_choices = pred.get_external_feeding_bellies()
+	if(!LAZYLEN(belly_choices))
+		to_chat(user, "<span class='warning'>[pred] doesn't have any bellies available for external feeding.</span>")
+		return FALSE
+	var/belly = tgui_input_list(usr, "Choose Belly", "Belly Choice", belly_choices)
+	// RS Edit End
 	return perform_the_nom(user, user, pred, belly)
 
 /mob/living/proc/feed_grabbed_to_other(mob/living/user, mob/living/prey, mob/living/pred)
@@ -575,7 +712,13 @@
 	if(!prey.ssd_vore_check(user))	//RS ADD
 		return FALSE				//RS ADD
 
-	var/belly = tgui_input_list(usr, "Choose Belly", "Belly Choice", pred.vore_organs)
+	// RS Edit Start: Allow external feeding option (Lira, January 2026)
+	var/list/belly_choices = pred.get_external_feeding_bellies()
+	if(!LAZYLEN(belly_choices))
+		to_chat(user, "<span class='warning'>[pred] doesn't have any bellies available for external feeding.</span>")
+		return FALSE
+	var/belly = tgui_input_list(usr, "Choose Belly", "Belly Choice", belly_choices)
+	// RS Edit End
 	return perform_the_nom(user, prey, pred, belly)
 
 //
@@ -748,15 +891,20 @@
     gas = list(
         "nitrogen" = 100)
 
-
-/mob/living/proc/feed_grabbed_to_self_falling_nom(var/mob/living/user, var/mob/living/prey)
-	var/belly = user.vore_selected
+// RS Edit: Use spont belly (Lira, January 2026)
+/mob/living/proc/feed_grabbed_to_self_falling_nom(var/mob/living/user, var/mob/living/prey, var/obj/belly/belly_override)
+	var/obj/belly/belly = belly_override ? belly_override : user.vore_selected
 	return perform_the_nom(user, prey, user, belly, delay = 1) //1/10th of a second is probably fine.
 
 /mob/living/proc/glow_toggle()
 	set name = "Glow (Toggle)"
 	set category = "Abilities"
 	set desc = "Toggle your glowing on/off!"
+
+	// RS Add: No using toggle when create shade active (Lira, October 2025)
+	if(has_modifier_of_type(/datum/modifier/shadekin/create_shade))
+		to_chat(src,"<span class='warning'>The shade refuses to loosen its hold; wait for it to fade before toggling your glow.</span>")
+		return
 
 	//I don't really see a point to any sort of checking here.
 	//If they're passed out, the light won't help them. Same with buckled. Really, I think it's fine to do this whenever.
@@ -1141,6 +1289,7 @@
 		dispvoreprefs += "<b>SSD Vore:</b> [ssd_vore ? "<font color='green'>Enabled</font>" : "<font color='red'>Disabled</font>"]<br>"
 	dispvoreprefs += "<b>Digestable:</b> [digestable ? "<font color='green'>Enabled</font>" : "<font color='red'>Disabled</font>"]<br>"
 	dispvoreprefs += "<b>Feedable:</b> [feeding ? "<font color='green'>Enabled</font>" : "<font color='red'>Disabled</font>"]<br>"
+	dispvoreprefs += "<b>Autotransferable:</b> [autotransferable ? "<font color='green'>Enabled</font>" : "<font color='red'>Disabled</font>"]<br>" //RS Add || Chomp Port 3200
 	dispvoreprefs += "<b>Absorption Permission:</b> [absorbable ? "<font color='green'>Allowed</font>" : "<font color='red'>Disallowed</font>"]<br>"
 	dispvoreprefs += "<b>Leaves Remains:</b> [digest_leave_remains ? "<font color='green'>Enabled</font>" : "<font color='red'>Disabled</font>"]<br>"
 	dispvoreprefs += "<b>Mob Vore:</b> [allowmobvore ? "<font color='green'>Enabled</font>" : "<font color='red'>Disabled</font>"]<br>"
@@ -1156,7 +1305,9 @@
 	dispvoreprefs += "<b>Slip Vore:</b> [(spont_pref_check(user,src,SLIP_VORE) && slip_vore) ? "<font color='green'>Enabled</font>" : "<font color='red'>Disabled</font>"]<br>"
 	dispvoreprefs += "<b>Throw vore:</b> [(spont_pref_check(user,src,THROW_VORE) && throw_vore) ? "<font color='green'>Enabled</font>" : "<font color='red'>Disabled</font>"]<br>"
 	dispvoreprefs += "<b>Stumble Vore:</b> [(spont_pref_check(user,src,STUMBLE_VORE) && stumble_vore) ? "<font color='green'>Enabled</font>" : "<font color='red'>Disabled</font>"]<br>"
+	dispvoreprefs += "<b>Buckle Vore:</b> [(spont_pref_check(user,src,BUCKLE_VORE) && buckle_vore) ? "<font color='green'>Enabled</font>" : "<font color='red'>Disabled</font>"]<br>" // RS Add: Split from stumble (Lira, January 2026)
 	dispvoreprefs += "<b>Food Vore:</b> [(spont_pref_check(user,src,FOOD_VORE) && food_vore) ? "<font color='green'>Enabled</font>" : "<font color='red'>Disabled</font>"]<br>"
+	dispvoreprefs += "<b>Emote Vore:</b> [(spont_pref_check(user,src,EMOTE_VORE) && emote_vore) ? "<font color='green'>Enabled</font>" : "<font color='red'>Disabled</font>"]<br>" // RS Add: New emote spont vore (Lira, February 2026)
 	dispvoreprefs += "<u><b>-OTHER PREFERENCES-</b></u><br>"
 	dispvoreprefs += "<b>Size changing:</b> [(spont_pref_check(user,src,RESIZING) && resizable) ? "<font color='green'>Enabled</font>" : "<font color='red'>Disabled</font>"]<br>"
 	dispvoreprefs += "<b>Inbelly Spawning:</b> [allow_inbelly_spawning ? "<font color='green'>Allowed</font>" : "<font color='red'>Disallowed</font>"]<br>"

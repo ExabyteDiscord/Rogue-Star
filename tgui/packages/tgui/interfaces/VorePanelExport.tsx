@@ -89,6 +89,7 @@ type Belly = {
   bulge_size: number;
   display_absorbed_examine: BooleanLike;
   save_digest_mode: BooleanLike;
+  allow_external_feeding: BooleanLike; // RS Add: Allow external feeding option (Lira, January 2026)
   emote_active: BooleanLike;
   emote_time: number;
   shrink_grow_size: number;
@@ -146,6 +147,16 @@ type Belly = {
 
   absorbchance: number;
   digestchance: number;
+
+  // Interactions (Auto-Transfer) || RS Add || Chomp Port 4734, 6155
+  autotransferwait: number;
+  autotransferchance: number;
+  autotransferlocation: string;
+  autotransfer_enabled: BooleanLike;
+  autotransferchance_secondary: number;
+  autotransferlocation_secondary: string;
+  autotransfer_min_amount: number;
+  autotransfer_max_amount: number;
 };
 
 // prettier-ignore
@@ -178,6 +189,7 @@ const generateBellyString = (belly: Belly, index: number) => {
     bulge_size,
     display_absorbed_examine,
     save_digest_mode,
+    allow_external_feeding, // RS Add: Allow external feeding option (Lira, January 2026)
     emote_active,
     emote_time,
     shrink_grow_size,
@@ -235,6 +247,16 @@ const generateBellyString = (belly: Belly, index: number) => {
 
     absorbchance,
     digestchance,
+
+    // Interactions (Auto-Transfer) || RS Add || Chomp Port 4734, 6155
+    autotransferwait,
+    autotransferchance,
+    autotransferlocation,
+    autotransferchance_secondary,
+    autotransferlocation_secondary,
+    autotransfer_enabled,
+    autotransfer_min_amount,
+    autotransfer_max_amount,
   } = belly;
 
   let result = '';
@@ -460,6 +482,7 @@ const generateBellyString = (belly: Belly, index: number) => {
   result += '<li class="list-group-item">Required Examine Size: ' + bulge_size * 100 + '%</li>';
   result += '<li class="list-group-item">Display Absorbed Examines: ' + (display_absorbed_examine ? '<span style="color: green;">True' : '<span style="color: red;">False') + '</li>';
   result += '<li class="list-group-item">Save Digest Mode: ' + (save_digest_mode ? '<span style="color: green;">True' : '<span style="color: red;">False') + '</li>';
+  result += '<li class="list-group-item">Allow External Feeding: ' + (allow_external_feeding ? '<span style="color: green;">Yes' : '<span style="color: red;">No') + '</li>'; // RS Add: Allow external feeding option (Lira, January 2026)
   result += '<li class="list-group-item">Idle Emotes: ' + (emote_active ? '<span style="color: green;">Active' : '<span style="color: red;">Inactive') + '</li>';
   result += '<li class="list-group-item">Idle Emote Delay: ' + emote_time + ' seconds</li>';
   result += '<li class="list-group-item">Shrink/Grow Size: ' + shrink_grow_size * 100 + '%</li>';
@@ -528,6 +551,20 @@ const generateBellyString = (belly: Belly, index: number) => {
   result += '<li class="list-group-item">Secondary Transfer Location: ' + transferlocation_secondary + '</li>';
   result += '<li class="list-group-item">Absorb Chance: ' + absorbchance + '%</li>';
   result += '<li class="list-group-item">Digest Chance: ' + digestchance + '%</li>';
+  result += '</ul>';
+  result += '<hr>';
+  result += '<b>Auto-Transfer Options (' + // Interactions (Auto-Transfer) || RS Add Start || Chomp Port 4734, 6155
+  (autotransfer_enabled ? '<span style="color: green;">Enabled' : '<span style="color: red;">Disabled') +
+  '</span>)</b>';
+  result += '<ul class="list-group">';
+  result += '<li class="list-group-item">Auto-Transfer Chance: ' + autotransferchance + '%</li>';
+  result += '<li class="list-group-item">Auto-Transfer Time: ' + autotransferwait / 10 + 's</li>';
+  result += '<li class="list-group-item">Auto-Transfer Chance: ' + autotransferchance + '%</li>';
+  result += '<li class="list-group-item">Auto-Transfer Location: ' + autotransferlocation + '</li>';
+  result += '<li class="list-group-item">Auto-Transfer Chance: ' + autotransferchance_secondary + '%</li>';
+  result += '<li class="list-group-item">Auto-Transfer Location: ' + autotransferlocation_secondary + '</li>';
+  result += '<li class="list-group-item">Auto-Transfer Min Amount: ' + autotransfer_min_amount + '</li>';
+  result += '<li class="list-group-item">Auto-Transfer Max Amount: ' + autotransfer_max_amount + '</li>'; // RS Add End
   result += '</ul>';
   result += '</div></div></div>';
 
@@ -608,12 +645,12 @@ const downloadPrefs = (context, extension: string) => {
           '</p><div class="accordion" id="accordionBellies">',
       ],
       {
-        type: 'text/html;charset=utf8',
+        type: 'text/html', // RS Edit || Virgo Port PR16922
       }
     );
     bellies.forEach((belly, i) => {
       blob = new Blob([blob, generateBellyString(belly, i)], {
-        type: 'text/html;charset=utf8',
+        type: 'text/html', // RS Edit || Virgo Port PR16922
       });
     });
     blob = new Blob(
@@ -623,7 +660,7 @@ const downloadPrefs = (context, extension: string) => {
         '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-A3rJD856KowSb7dwlZdYEkO39Gagi7vIsF0jrRAoQmDKKtQBHUuLZ9AsSv4jD4Xa" crossorigin="anonymous"></script>',
         '</div></main></body></html>',
       ],
-      { type: 'text/html;charset=utf8' }
+      { type: 'text/html' } // RS Edit || Virgo Port PR16922
     );
   }
 
@@ -631,7 +668,7 @@ const downloadPrefs = (context, extension: string) => {
     blob = new Blob([JSON.stringify(bellies)], { type: 'application/json' });
   }
 
-  (window.navigator as any).msSaveOrOpenBlob(blob, filename);
+  Byond.saveBlob(blob, filename, extension); // RS Edit || Virgo Port PR16922
 };
 
 export const VorePanelExport = () => {

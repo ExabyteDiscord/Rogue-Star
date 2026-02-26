@@ -11,8 +11,10 @@ GLOBAL_VAR(special_station_name)
 	var/list/possible_verbs = list(
 		/mob/living/proc/blue_shift,
 		/mob/living/proc/vore_leap_attack,
+		/mob/living/proc/sense_ghosts,
 		/mob/living/proc/set_size,
-		/mob/living/proc/pomf
+		/mob/living/proc/pomf,
+		/mob/living/proc/register_home
 		)
 
 	var/choice = tgui_input_list(usr, "Which verb would you like to add/remove?", "Event Verb", possible_verbs)
@@ -35,6 +37,10 @@ GLOBAL_VAR(special_station_name)
 	if(choice in target.verbs)
 		if(tgui_alert(usr, "[target] has access to [choice] already. Would you like to remove this verb from them?", "Remove Verb",list("No","Yes")) == "Yes")
 			target.verbs.Remove(choice)
+			if(choice == /mob/living/proc/register_home)
+				var/datum/modifier/return_home/mod = target.get_modifier_of_type(/datum/modifier/return_home)
+				if(mod)
+					mod.expire()
 			to_chat(usr,"<span class = 'warning'>Removed [choice] from [target].</span>")
 	else
 		if(tgui_alert(usr, "Would you like to add [choice] to [target]?", "Add Verb",list("No","Yes")) == "Yes")
@@ -109,6 +115,29 @@ GLOBAL_VAR(special_station_name)
 	if(Adjacent(choice))	//We leapt at them but we didn't manage to hit them, let's see if we're next to them
 		choice.Weaken(2)	//get knocked down, idiot
 
+/mob/living/proc/sense_ghosts()
+	set name = "Sense Incorporeal Beings"
+	set desc = "Sense if there is a ghost nearby!"
+
+	if(stat || paralysis || weakened || stunned) //Can't focus on ghosts if you're weakened/occupied
+		to_chat(src, "<span class='warning'>You can't do that in your current state.</span>")
+		return
+
+	var/mob/observer/dead/spook = locate() in range(src, 3) //Locate any ghosts in 3 tiles
+	if(spook)
+		var/turf/T = get_turf(spook)
+		var/list/visible = list()
+		for(var/obj/O in T.contents)
+			if(!O.invisibility && O.name)
+				visible += O
+		if(visible.len)
+			var/atom/A = pick(visible) //Pick a ghost that has something nearby
+			to_chat(src, "<span class='notice'>You sense something is[istype(A) ? " near [A]":""].</span>")
+		else //Otherwise, you are merely in the presence of something spooky
+			to_chat(src, "<span class='notice'>You sense something is nearby.</span>")
+	else 	//Nothing spooky here!
+		to_chat(src, "<span class='notice'>Nothing seems to be nearby.</span>")
+
 /client/proc/change_station_name()
 	set category = "Fun"
 	set name = "Change Station Name"
@@ -145,6 +174,46 @@ GLOBAL_VAR(special_station_name)
 		L.AdjustStunned(3)
 		L.AdjustWeakened(3)
 		to_chat(L,SPAN_WARNING("\The [src]'s call knocks you to the ground!"))
+
+/client/proc/summon()
+	set name = "Summon"
+	set desc = "Summon them!"
+	set category = "Fun"
+	set waitfor = FALSE
+
+	if(!check_rights(R_ADMIN|R_MOD|R_DEBUG|R_EVENT))
+		return
+	if(!config.allow_admin_jump)
+		to_chat(usr, "Admin jumping disabled")
+		return
+
+	var/choice = tgui_alert(usr, "What range do you want to summon people at?","Summoning",list("Cancel","This Z","Global"))
+
+	if(!choice || choice == "Cancel") return
+
+	var/turf/T = get_turf(usr)
+	playsound(mob, 'sound/effects/genetics.ogg', 75, 1)
+	for(var/mob/living/L in player_list)
+		if(!isliving(L))	//Don't summon ghosts or whatever
+			continue
+		if(L == usr)		//Don't summon yourself
+			continue
+		if(isbelly(L.loc))	//their pred will get asked instead
+			continue
+		if(choice == "This Z")	//Extra logic for only affecting people on the same Z
+			var/turf/ourturf = get_turf(L)	//In case someone is hidden in a state where they are not technically on a turf, such as closets, reagent containers, etc
+			if(T.z != ourturf.z)
+				continue
+
+		SEND_SOUND(src, sound('sound/misc/server-ready.ogg'))
+		tgui_alert_async(L, "\The [usr] is summoning you to their location. Would you like to join them?", "Summoning", list("Yes", "No"), CALLBACK(src, PROC_REF(summon_reply),L,T), null)
+
+/client/proc/summon_reply(var/mob/living/L,var/turf/T,response)
+	if(!response) return
+	if(response != "Yes") return
+	if(!L) return
+	if(!T) return
+	L.forceMove(T)
 
 /obj/item/weapon/material/sword/wind_blade
 	name = "wind blade"
@@ -210,3 +279,87 @@ GLOBAL_VAR(special_station_name)
 	impact_effect_type = /obj/effect/temp_visual/impact_effect/blue_laser
 	hitsound_wall = 'sound/effects/bang.ogg'
 	speed = 2
+
+/client/proc/add_trait()
+	set name = "Add Trait"
+	set category = "Fun"
+
+	if(!check_rights(R_FUN)) return
+
+	var/choice = tgui_input_list(usr,"Who will you apply the trait to?","Apply Trait",player_list)
+	if(!choice) return
+	if(!ishuman(choice))
+		to_chat(usr,SPAN_WARNING("\The [choice] can't take traits."))
+		return
+	var/mob/living/carbon/human/H = choice
+	choice = null
+	//var/list/ourtraits = subtypesof(/datum/trait)
+	choice = tgui_input_list(usr, "What trait will you apply to [H]?","Apply Trait",all_traits)
+	if(!choice) return
+
+	var/datum/trait/ourtrait = new choice()
+	ourtrait.apply(H.species,H,H.species.traits[ourtrait])
+
+	log_and_message_admins("has applied trait: [ourtrait] ([choice]) to [H].")
+
+/obj/trait_adder
+	name = "trait_adder"
+	icon = 'icons/rogue-star/misc.dmi'
+	icon_state = "crystal_key"
+
+	plane = PLANE_ADMIN_SECRET
+
+	var/trait
+
+/obj/trait_adder/Crossed(O)
+	. = ..()
+	if(!trait) return
+	if(!ishuman(O)) return
+
+	var/mob/living/carbon/human/H = O
+	var/datum/trait/ourtrait = new trait()
+	ourtrait.apply(H.species,H,H.species.traits[ourtrait])
+	log_debug("\The [src] has applied trait: [ourtrait] ([trait]) to [H].")
+	to_chat(H,SPAN_NOTICE("[ourtrait] was added to your traits! You feel your abilities expand!! You get the feeling this change will fade later."))
+	H << 'sound/effects/ding.ogg'
+
+/atom/movable/notifier
+	name = "notifier"
+	icon = 'icons/rogue-star/misc.dmi'
+	icon_state = "notifier"
+	plane = PLANE_ADMIN_SECRET
+	anchored = TRUE
+	alpha = 125
+	var/list/notify_who = list()
+
+/atom/movable/notifier/attack_ghost(mob/user)
+	. = ..()
+
+	if(!user?.client?.holder) return
+
+	if(user.ckey in notify_who)
+		remove_notification(user)
+	else
+		add_notification(user)
+
+/atom/movable/notifier/proc/add_notification(var/mob/M)
+	if(!M) return
+	if(!M.ckey) return
+
+	notify_who.Add(M.ckey)
+	to_chat(M,SPAN_NOTICE("Added you to the notification list."))
+
+/atom/movable/notifier/proc/remove_notification(var/mob/M)
+	if(!M) return
+	if(!M.ckey) return
+
+	notify_who.Remove(M.ckey)
+	to_chat(M,SPAN_WARNING("Removed you from the notification list."))
+
+/atom/movable/notifier/Crossed(O)
+	. = ..()
+	if(isobserver(O)) return	//Let's not trigger on ghosts
+	for(var/mob/M in player_list)
+		if(M.ckey in notify_who)
+			M << 'sound/rogue-star/misc/ghost_alert.ogg'
+			to_chat(M,SPAN_WARNING("[O] HAS CROSSED [src]"))

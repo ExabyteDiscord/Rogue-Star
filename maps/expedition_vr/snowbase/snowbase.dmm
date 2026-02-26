@@ -23,7 +23,7 @@
 "ar" = (
 /obj/effect/shuttle_landmark{
 	base_area = /area/tether_away/snowbase/outside;
-	base_turf = /turf/simulated/floor/outdoors/snow;
+	base_turf = /turf/simulated/floor/outdoors/snow/snowbase;
 	landmark_tag = "snowbase_surface_w";
 	name = "NT Outpost - Northwest"
 	},
@@ -32,7 +32,7 @@
 "aC" = (
 /obj/effect/shuttle_landmark{
 	base_area = /area/tether_away/snowbase/outside;
-	base_turf = /turf/simulated/floor/outdoors/snow;
+	base_turf = /turf/simulated/floor/outdoors/snow/snowbase;
 	landmark_tag = "snowbase_surface_e";
 	name = "NT Outpost - Northeast"
 	},
@@ -1139,6 +1139,15 @@
 /obj/structure/window/reinforced,
 /turf/simulated/floor/plating,
 /area/tether_away/snowbase/research)
+"mz" = (
+/obj/effect/shuttle_landmark{
+	base_area = /area/tether_away/snowbase/outside;
+	base_turf = /turf/simulated/floor/outdoors/snow/snowbase;
+	landmark_tag = "snowbase_surface_n";
+	name = "NT Outpost - Northern Ice Field"
+	},
+/turf/simulated/floor/outdoors/snow/snowbase,
+/area/tether_away/snowbase/outside)
 "mK" = (
 /obj/machinery/atmospherics/unary/vent_scrubber/on{
 	dir = 8
@@ -3769,6 +3778,10 @@
 	outdoors = 1
 	},
 /area/tether_away/snowbase/outside)
+"Mo" = (
+/obj/fiftyspawner/log,
+/turf/simulated/mineral/floor/icey/snowbase/ignore_mapgen,
+/area/tether_away/snowbase/outside)
 "My" = (
 /obj/structure/cable{
 	icon_state = "4-8"
@@ -4728,6 +4741,7 @@
 	dir = 8
 	},
 /obj/machinery/firealarm,
+/obj/structure/medical_stand,
 /turf/simulated/floor/tiled,
 /area/tether_away/snowbase/morgue)
 "Tu" = (
@@ -6229,7 +6243,7 @@ XV
 XV
 XV
 XV
-XV
+sT
 XV
 XV
 XV
@@ -6370,9 +6384,9 @@ XV
 XV
 XV
 XV
-XV
-XV
-XV
+sT
+sT
+sT
 XV
 XV
 XV
@@ -6511,9 +6525,9 @@ XV
 XV
 XV
 XV
-XV
-XV
-XV
+sT
+sT
+sT
 XV
 XV
 XV
@@ -6652,9 +6666,9 @@ XV
 XV
 XV
 XV
-XV
-XV
-XV
+sT
+sT
+sT
 XV
 XV
 XV
@@ -6803,8 +6817,8 @@ XV
 XV
 XV
 XV
-XV
-XV
+sT
+sT
 XV
 XV
 XV
@@ -6943,10 +6957,10 @@ XV
 XV
 XV
 XV
-XV
-XV
-XV
-XV
+sT
+sT
+sT
+sT
 XV
 XV
 XV
@@ -7085,10 +7099,10 @@ XV
 XV
 XV
 XV
-XV
-XV
-XV
-XV
+sT
+sT
+sT
+sT
 XV
 XV
 XV
@@ -7226,10 +7240,10 @@ XV
 XV
 XV
 XV
-XV
-XV
-XV
-XV
+sT
+sT
+sT
+sT
 XV
 XV
 XV
@@ -7368,9 +7382,9 @@ XV
 XV
 XV
 XV
-XV
-XV
-XV
+sT
+sT
+sT
 XV
 XV
 XV
@@ -8083,8 +8097,8 @@ XV
 XV
 XV
 XV
-XV
-XV
+sT
+sT
 XV
 XV
 XV
@@ -8225,9 +8239,9 @@ XV
 XV
 XV
 XV
-XV
-XV
-XV
+sT
+sT
+sT
 XV
 XV
 XV
@@ -8366,10 +8380,10 @@ XV
 XV
 XV
 XV
-XV
-XV
-XV
-XV
+sT
+sT
+sT
+sT
 XV
 XV
 XV
@@ -8507,10 +8521,10 @@ XV
 XV
 XV
 XV
-XV
-XV
-XV
-XV
+sT
+sT
+sT
+sT
 XV
 XV
 XV
@@ -8648,10 +8662,10 @@ XV
 XV
 XV
 XV
-XV
-XV
-XV
-XV
+sT
+sT
+sT
+sT
 XV
 XV
 XV
@@ -8789,11 +8803,11 @@ XV
 XV
 XV
 XV
-XV
-XV
-XV
-XV
-XV
+sT
+sT
+sT
+sT
+sT
 XV
 XV
 XV
@@ -8932,18 +8946,18 @@ XV
 XV
 XV
 XV
+sT
+sT
+sT
 XV
 XV
 XV
 XV
 XV
 XV
-XV
-XV
-XV
-XV
-XV
-XV
+sT
+sT
+sT
 XV
 XV
 XV
@@ -9082,11 +9096,11 @@ XV
 XV
 XV
 XV
-XV
-XV
-XV
-XV
-XV
+sT
+sT
+sT
+sT
+sT
 XV
 XV
 XV
@@ -9223,11 +9237,11 @@ XV
 XV
 XV
 XV
-XV
-XV
-XV
-XV
-XV
+sT
+sT
+sT
+sT
+sT
 XV
 XV
 XV
@@ -9365,10 +9379,10 @@ XV
 XV
 XV
 XV
-XV
-XV
-XV
-XV
+sT
+sT
+sT
+sT
 XV
 XV
 XV
@@ -9506,10 +9520,10 @@ XV
 XV
 XV
 XV
-XV
-XV
-XV
-XV
+sT
+sT
+sT
+sT
 XV
 XV
 XV
@@ -9648,6 +9662,9 @@ XV
 XV
 XV
 XV
+sT
+sT
+sT
 XV
 XV
 XV
@@ -9657,14 +9674,11 @@ XV
 XV
 XV
 XV
-XV
-XV
-XV
-Aq
-Aq
-Aq
-Aq
-Aq
+sT
+sT
+sT
+sT
+sT
 XV
 XV
 XV
@@ -9791,6 +9805,7 @@ XV
 XV
 XV
 XV
+sT
 XV
 XV
 XV
@@ -9800,14 +9815,13 @@ XV
 XV
 XV
 XV
-XV
-Aq
-Aq
-Aq
-Aq
-Aq
-Aq
-Aq
+sT
+sT
+sT
+sT
+sT
+sT
+sT
 XV
 XV
 XV
@@ -9945,12 +9959,12 @@ XV
 XV
 XV
 XV
-Aq
-Aq
-Aq
-Aq
-Aq
-Aq
+sT
+sT
+sT
+sT
+sT
+sT
 XV
 XV
 XV
@@ -10089,11 +10103,11 @@ XV
 XV
 XV
 XV
-Aq
-Aq
-Aq
-Aq
-Aq
+sT
+sT
+sT
+sT
+sT
 XV
 XV
 XV
@@ -10212,7 +10226,7 @@ XV
 XV
 XV
 XV
-XV
+sT
 XV
 XV
 XV
@@ -10354,8 +10368,8 @@ XV
 XV
 XV
 XV
-XV
-XV
+sT
+sT
 XV
 XV
 XV
@@ -10496,15 +10510,15 @@ XV
 XV
 XV
 XV
+sT
+sT
 XV
 XV
 XV
 XV
 XV
-XV
-XV
-XV
-XV
+sT
+sT
 XV
 XV
 XV
@@ -10638,16 +10652,16 @@ XV
 XV
 XV
 XV
+sT
 XV
 XV
 XV
 XV
 XV
 XV
-XV
-XV
-XV
-XV
+sT
+sT
+sT
 XV
 XV
 XV
@@ -10779,17 +10793,17 @@ XV
 XV
 XV
 XV
+sT
+sT
 XV
 XV
 XV
 XV
 XV
-XV
-XV
-XV
-XV
-XV
-XV
+sT
+sT
+sT
+sT
 XV
 XV
 XV
@@ -10921,17 +10935,17 @@ XV
 XV
 XV
 XV
+sT
+sT
 XV
 XV
 XV
 XV
 XV
-XV
-XV
-XV
-XV
-XV
-XV
+sT
+sT
+sT
+sT
 XV
 XV
 XV
@@ -11070,9 +11084,9 @@ XV
 XV
 XV
 XV
-XV
-XV
-XV
+sT
+sT
+sT
 XV
 XV
 XV
@@ -11211,10 +11225,10 @@ XV
 XV
 XV
 XV
-XV
-XV
-XV
-XV
+sT
+sT
+sT
+sT
 XV
 XV
 XV
@@ -11353,9 +11367,9 @@ XV
 XV
 XV
 XV
-XV
-XV
-XV
+sT
+sT
+sT
 XV
 XV
 XV
@@ -11494,10 +11508,10 @@ XV
 XV
 XV
 XV
-XV
-XV
-XV
-XV
+sT
+sT
+sT
+sT
 XV
 XV
 XV
@@ -11637,9 +11651,9 @@ XV
 XV
 XV
 XV
-XV
-XV
-XV
+sT
+sT
+sT
 XV
 XV
 XV
@@ -11778,9 +11792,9 @@ XV
 XV
 XV
 XV
-XV
-XV
-XV
+sT
+sT
+sT
 XV
 XV
 XV
@@ -11919,9 +11933,9 @@ XV
 XV
 XV
 XV
-XV
-XV
-XV
+sT
+sT
+sT
 XV
 XV
 XV
@@ -12061,8 +12075,8 @@ XV
 XV
 XV
 XV
-XV
-XV
+sT
+sT
 XV
 XV
 XV
@@ -12778,7 +12792,7 @@ XV
 XV
 XV
 XV
-XV
+sT
 XV
 XV
 XV
@@ -12919,8 +12933,8 @@ XV
 XV
 XV
 XV
-XV
-XV
+sT
+sT
 XV
 XV
 XV
@@ -13061,8 +13075,8 @@ XV
 XV
 XV
 XV
-XV
-XV
+sT
+sT
 XV
 XV
 XV
@@ -13202,8 +13216,8 @@ XV
 XV
 XV
 XV
-XV
-XV
+sT
+sT
 XV
 XV
 XV
@@ -13344,8 +13358,8 @@ XV
 XV
 XV
 XV
-XV
-XV
+sT
+sT
 XV
 XV
 XV
@@ -13486,7 +13500,7 @@ XV
 XV
 XV
 XV
-XV
+sT
 XV
 XV
 XV
@@ -13930,7 +13944,7 @@ XV
 XV
 XV
 XV
-ar
+XV
 XV
 XV
 XV
@@ -14053,7 +14067,7 @@ XV
 XV
 XV
 XV
-XV
+sT
 XV
 XV
 sT
@@ -14194,8 +14208,8 @@ XV
 XV
 XV
 XV
-XV
-XV
+sT
+sT
 XV
 XV
 sT
@@ -14336,8 +14350,8 @@ XV
 XV
 XV
 XV
-XV
-XV
+sT
+sT
 XV
 XV
 sT
@@ -14478,7 +14492,7 @@ XV
 XV
 XV
 XV
-XV
+sT
 XV
 XV
 XV
@@ -15068,7 +15082,7 @@ XV
 XV
 XV
 XV
-XV
+ar
 XV
 XV
 XV
@@ -15316,7 +15330,7 @@ XV
 XV
 XV
 XV
-XV
+mz
 XV
 XV
 XV
@@ -16204,7 +16218,7 @@ XV
 XV
 XV
 XV
-XV
+aC
 XV
 XV
 XV
@@ -17338,7 +17352,7 @@ XV
 XV
 XV
 XV
-aC
+XV
 XV
 XV
 XV
@@ -17601,7 +17615,7 @@ XV
 XV
 XV
 XV
-XV
+sT
 XV
 XV
 XV
@@ -17743,8 +17757,8 @@ XV
 XV
 XV
 XV
-XV
-XV
+sT
+sT
 XV
 XV
 XV
@@ -17884,9 +17898,9 @@ XV
 XV
 XV
 XV
-XV
-XV
-XV
+sT
+sT
+sT
 XV
 XV
 XV
@@ -18027,8 +18041,8 @@ XV
 XV
 XV
 XV
-XV
-XV
+sT
+sT
 XV
 XV
 XV
@@ -18169,9 +18183,9 @@ XV
 XV
 XV
 XV
-XV
-XV
-XV
+sT
+sT
+sT
 XV
 XV
 XV
@@ -18312,8 +18326,8 @@ XV
 XV
 XV
 XV
-XV
-XV
+sT
+sT
 XV
 XV
 XV
@@ -18454,8 +18468,8 @@ XV
 XV
 XV
 XV
-XV
-XV
+sT
+sT
 XV
 XV
 XV
@@ -19160,8 +19174,8 @@ XV
 XV
 XV
 XV
-XV
-XV
+sT
+sT
 XV
 XV
 XV
@@ -19301,10 +19315,10 @@ XV
 XV
 XV
 XV
-XV
-XV
-XV
-XV
+sT
+sT
+sT
+sT
 XV
 XV
 XV
@@ -19444,10 +19458,10 @@ XV
 XV
 XV
 XV
-XV
-XV
-XV
-XV
+sT
+sT
+sT
+sT
 XV
 XV
 XV
@@ -19586,10 +19600,10 @@ XV
 XV
 XV
 XV
-XV
-XV
-XV
-XV
+sT
+sT
+sT
+sT
 XV
 XV
 XV
@@ -19729,11 +19743,11 @@ XV
 XV
 XV
 XV
-XV
-XV
-XV
-XV
-XV
+sT
+sT
+sT
+sT
+sT
 XV
 XV
 XV
@@ -19872,10 +19886,10 @@ XV
 XV
 XV
 XV
-XV
-XV
-XV
-XV
+sT
+sT
+sT
+sT
 XV
 XV
 XV
@@ -20015,10 +20029,10 @@ XV
 XV
 XV
 XV
-XV
-XV
-XV
-XV
+sT
+sT
+sT
+sT
 XV
 XV
 XV
@@ -20158,10 +20172,10 @@ XV
 XV
 XV
 XV
-XV
-XV
-XV
-XV
+sT
+sT
+sT
+sT
 XV
 XV
 XV
@@ -22787,7 +22801,7 @@ Wo
 Wo
 Wo
 MD
-bK
+Mo
 bK
 bK
 Wo
@@ -23415,7 +23429,7 @@ XV
 XV
 XV
 XV
-XV
+sT
 XV
 XV
 XV
@@ -23556,9 +23570,9 @@ XV
 XV
 XV
 XV
-XV
-XV
-XV
+sT
+sT
+sT
 XV
 XV
 XV
@@ -23698,9 +23712,9 @@ XV
 XV
 XV
 XV
-XV
-XV
-XV
+sT
+sT
+sT
 XV
 XV
 XV
@@ -23839,9 +23853,9 @@ XV
 XV
 XV
 XV
-XV
-XV
-XV
+sT
+sT
+sT
 XV
 XV
 XV
@@ -23981,8 +23995,8 @@ XV
 XV
 XV
 XV
-XV
-XV
+sT
+sT
 XV
 XV
 XV
@@ -24122,8 +24136,8 @@ XV
 XV
 XV
 XV
-XV
-XV
+sT
+sT
 XV
 XV
 XV
@@ -24264,7 +24278,7 @@ XV
 XV
 XV
 XV
-XV
+sT
 XV
 XV
 XV

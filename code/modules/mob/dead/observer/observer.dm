@@ -122,7 +122,21 @@
 		// Unclear why this isn't being grabbed by appearance.
 		if(ishuman(body))
 			var/mob/living/carbon/human/H = body
-			add_overlay(H.overlays_standing)
+			// RS Add Start: Capture custom marking ordering (Lira, November 2025)
+			var/list/overlay_payload = list()
+			if(islist(H.overlays_standing))
+				for(var/entry in H.overlays_standing)
+					if(!entry)
+						continue
+					if(islist(entry))
+						for(var/subentry in entry)
+							if(subentry)
+								overlay_payload += subentry
+						continue
+					overlay_payload += entry
+			if(length(overlay_payload))
+				add_overlay(overlay_payload)
+			// RS Add End
 		default_pixel_x = body.default_pixel_x
 		default_pixel_y = body.default_pixel_y
 	if(!T && length(latejoin))
@@ -239,6 +253,8 @@ This is the proc mobs get to turn into a ghost. Forked from ghostize due to comp
 	set category = "OOC"
 	set name = "Ghost"
 	set desc = "Relinquish your life and enter the land of the dead."
+
+	reset_look()	//RS ADD
 
 	if(stat == DEAD && !forbid_seeing_deadchat)
 		announce_ghost_joinleave(ghostize(1))
@@ -728,8 +744,9 @@ This is the proc mobs get to turn into a ghost. Forked from ghostize due to comp
 	set category = "Ghost"
 
 	var/dat
-	dat += "<h4>Crew Manifest</h4>"
+	dat += "<html><h4>Crew Manifest</h4>"
 	dat += data_core.get_manifest()
+	dat += "</html>"
 
 	src << browse(dat, "window=manifest;size=370x420;can_close=1")
 
@@ -1037,7 +1054,7 @@ This is the proc mobs get to turn into a ghost. Forked from ghostize due to comp
 			var/obj/item/device/paicard/PP = p
 			if(PP.pai == null)
 				count++
-				PP.add_overlay("pai-ghostalert")
+				PP.add_overlay(PP.ghostalert_overlay_state) // RS Add: Off duty AI support (Lira, November 2025)
 				PP.alertUpdate()
 				spawn(54)
 					PP.cut_overlays()

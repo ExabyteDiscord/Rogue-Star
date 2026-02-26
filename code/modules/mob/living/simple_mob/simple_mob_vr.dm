@@ -70,6 +70,20 @@
 	if(myid)
 		return myid
 
+// Update fullness based on size & quantity of belly contents
+/mob/living/simple_mob/update_fullness(returning)
+	var/new_fullness = 0
+	for(var/obj/belly/B as anything in vore_organs)
+		for(var/mob/living/M in B)
+			//RS edit start
+			if(!M.absorbed || B.count_absorbed_prey_for_sprite)
+				new_fullness += M.size_multiplier
+			//RS edit end
+	new_fullness = new_fullness / size_multiplier //Divided by pred's size so a macro mob won't get macro belly from a regular prey.
+	new_fullness = new_fullness * belly_size_multiplier // Some mobs are small even at 100% size. Let's account for that.
+	new_fullness = round(new_fullness, 1) // Because intervals of 0.25 are going to make sprite artists cry.
+	vore_fullness = min(vore_capacity, new_fullness)
+
 /mob/living/simple_mob/update_icon()
 	. = ..()
 	if(vore_active)
@@ -100,6 +114,8 @@
 		return 0
 	if(src == M) //Don't eat YOURSELF dork
 		//ai_log("vr/won't eat [M] because it's me!", 3) //VORESTATION AI TEMPORARY REMOVAL
+		return 0
+	if(M.is_incorporeal()) //RS Edit Chomp port #7484 | CHOMPADD - No eating the phased ones
 		return 0
 	if(vore_ignores_undigestable && !M.digestable) //Don't eat people with nogurgle prefs
 		//ai_log("vr/wont eat [M] because I am picky", 3) //VORESTATION AI TEMPORARY REMOVAL
@@ -134,6 +150,21 @@
 
 		// We're not attempting a pounce, if they're down or we can eat standing, do it as long as they're edible. Otherwise, hit normally.
 		//if(will_eat(L) && (!L.canmove || vore_standing_too))
+		if(hunter && !L.player_login_key_log)	//RS EDIT START
+			if(L.stat == DEAD)
+				if(food_pref_obligate)	//RS ADD START
+					if(food_pref == CARNIVORE)
+						if(L.food_class != FP_MEAT)
+							ai_holder?.set_stance(STANCE_IDLE)
+							return
+					if(food_pref == HERBIVORE)
+						if(L.food_class != FP_PLANT)
+							ai_holder?.set_stance(STANCE_IDLE)
+							return		//RS ADD END
+				feed_from_target(L)
+				return
+			if(mob_size <= L.mob_size + 10)
+				return ..()	//RS EDIT END - Do not vore things that you aren't quite a bit bigger than if you are a hunter dealing with an NPC
 		if(will_eat(L) && (L.lying || vore_standing_too)) //RS Port Chomp PR 7900 || CHOMPEdit
 			return EatTarget(L)
 		else
@@ -141,9 +172,10 @@
 	else
 		return ..()
 
-
 /mob/living/simple_mob/proc/CanPounceTarget(var/mob/living/M) //returns either FALSE or a %chance of success
 	if(!M.canmove || issilicon(M) || world.time < vore_pounce_cooldown) //eliminate situations where pouncing CANNOT happen
+		return FALSE
+	if(M.is_incorporeal()) //RS Add Chomp port #7484 | CHOMPADD - No pouncing on the shades
 		return FALSE
 	if(!prob(vore_pounce_chance) || !will_eat(M)) //mob doesn't want to pounce
 		return FALSE
@@ -166,6 +198,9 @@
 		playsound(src, 'sound/weapons/punchmiss.ogg', 25, 1, -1)
 
 	//if(will_eat(M) && (!M.canmove || vore_standing_too)) //if they're edible then eat them too
+	if(hunter && !M.player_login_key_log)	//RS ADD - Don't vore things we're hunting!
+		return	//RS ADD
+
 	if(will_eat(M) && (M.lying || vore_standing_too)) //if they're edible then eat them too //RS Port Chomp PR 7900 || CHOMPEdit Crawling compat
 		return EatTarget(M)
 	else
@@ -257,6 +292,8 @@
 		"The stomach glorps and gurgles as it tries to work you into slop.")
 	can_be_drop_pred = TRUE // Mobs will eat anyone that decides to drop/slip into them by default.
 	B.belly_fullscreen = "yet_another_tumby"
+	B.belly_healthbar_overlay_theme = "Stomach"		//RS ADD
+	B.belly_healthbar_overlay_color = "#823232"	//RS ADD
 
 /mob/living/simple_mob/Bumped(var/atom/movable/AM, yes)
 	if(tryBumpNom(AM))

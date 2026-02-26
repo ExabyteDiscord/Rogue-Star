@@ -1,5 +1,5 @@
 #define SAVEFILE_VERSION_MIN	8
-#define SAVEFILE_VERSION_MAX	11
+#define SAVEFILE_VERSION_MAX	12 // RS Edit: Update to 12 (Lira, February 2026)
 
 //handles converting savefiles to new formats
 //MAKE SURE YOU KEEP THIS UP TO DATE!
@@ -48,6 +48,13 @@
 			return 0
 
 	player_setup.load_preferences(S)
+
+	// RS Add: One-time migration TGUI input default (Lira, February 2026)
+	if(savefile_version < 12)
+		tgui_input_mode = TRUE
+		savefile_version = SAVEFILE_VERSION_MAX
+		save_preferences()
+
 	return 1
 
 /datum/preferences/proc/save_preferences()
@@ -61,6 +68,7 @@
 	return 1
 
 /datum/preferences/proc/load_character(slot)
+	close_custom_marking_designer() //RS Add: Force TGUI window to close (Lira, September 2025)
 	if(!path)				return 0
 	if(!fexists(path))		return 0
 	var/savefile/S = new /savefile(path)
@@ -82,6 +90,17 @@
 		player_setup.load_character(S)
 		S.cd = "/character[default_slot]"
 		player_setup.save_character(S)
+	// RS Add Start: Debug for slot loading (Lira, September 2025)
+	var/loaded_slot = slot
+	if(loaded_slot == SAVE_RESET)
+		loaded_slot = default_slot
+	var/debug_ckey = client_ckey
+	if(!debug_ckey && client)
+		debug_ckey = client.ckey
+	if(!debug_ckey)
+		debug_ckey = "unknown"
+	log_debug("[debug_ckey] loaded character slot [loaded_slot] (requested=[slot]).")
+	// RS Add End
 
 	clear_character_previews() // VOREStation Edit
 

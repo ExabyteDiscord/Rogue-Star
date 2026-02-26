@@ -10,7 +10,7 @@ env:
 jobs:
   file_tests:
     name: Run Linters
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Ensure +x on CI directory
@@ -36,7 +36,7 @@ jobs:
 
   dreamchecker:
     name: DreamChecker
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -44,7 +44,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ~/SpacemanDMM
-          key: ${{ runner.os }}-dreamchecker-${{ hashFiles('dependencies.sh')}}
+          key: ${{ runner.os }}-dreamchecker-${{ hashFiles('_build_dependencies.sh')}} #RS Edit: Fix dependency file (Lira, August 2025)
           restore-keys: ${{ runner.os }}-dreamchecker
 
       - name: Install Dependencies
@@ -65,11 +65,11 @@ jobs:
   unit_tests:
     strategy:
       matrix:
-        map: ['stellar_delight', 'groundbase']
+        map: ['SD_MAP', 'RP_MAP', 'SP_MAP']   #RS EDIT
     # name: Integration Tests (${{ matrix.map }})
     name: Integration Tests
     # needs: ['file_tests', 'dreamchecker']
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Ensure +x on CI directory
@@ -84,7 +84,7 @@ jobs:
         run: |
           sudo dpkg --add-architecture i386
           sudo apt update || true
-          sudo apt install zlib1g-dev:i386 libssl-dev:i386
+          sudo apt install zlib1g-dev:i386 libssl-dev:i386 libcurl4-openssl-dev:i386
           ldd librust_g.so
       - name: Unit Tests
         run: |
@@ -95,6 +95,7 @@ jobs:
           TEST_FILE: "code/_unit_tests.dm"
           MAP: ${{ matrix.map }}
           REPLACE: true
+          EXTRA_ARGS: "-D${{ matrix.map }}"   #RS EDIT
           RUN: "1"
       - name: Compile POIs
         run: |
@@ -120,7 +121,7 @@ jobs:
   tests_successful:
     name: Integration Tests
     needs: ['file_tests', 'dreamchecker', 'unit_tests']
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Report Success
         run: |

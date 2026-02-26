@@ -102,6 +102,7 @@
 	playsound(src, 'sound/weapons/wave.ogg', 60, 1)
 
 	user.visible_message("<span class='warning'>[user] fires \the [src]!</span>","<span class='warning'>You fire \the [src]!</span>")
+	SEND_SIGNAL(user,COMSIG_MOB_FIRED_GUN)	//RS ADD
 
 	var/datum/effect/effect/system/spark_spread/s = new /datum/effect/effect/system/spark_spread
 	s.set_up(4, 1, A)
@@ -161,6 +162,7 @@
 							living_user.forceMove(belly_dest)
 							to_chat(pred, "<span class='notice'>[living_user] materializes inside you as they end up in your [belly_dest]!</span>")
 							to_chat(living_user, "<span class='danger'>You materialize inside [pred] as you end up in their [belly_dest]!</span>")
+							pred.update_icon() //RS Add: Fixes bug where tum was not updating (Lira, May 2025)
 
 	else
 		for(var/obj/O in FromTurf)

@@ -1,7 +1,15 @@
 import { round } from 'common/math';
 import { Fragment } from 'inferno';
 import { useBackend } from '../backend';
-import { Box, Button, Flex, Icon, LabeledList, ProgressBar, Section } from '../components';
+import {
+  Box,
+  Button,
+  Flex,
+  Icon,
+  LabeledList,
+  ProgressBar,
+  Section,
+} from '../components';
 import { Window } from '../layouts';
 
 const stats = [
@@ -38,11 +46,11 @@ export const Sleeper = (props, context) => {
   const body = hasOccupant ? <SleeperMain /> : <SleeperEmpty />;
   return (
     <Window width={550} height={760} resizable>
-      <Window.Content className="Layout__content--flexColumn">
+      <Window.Content scrollable className="Layout__content--flexColumn">
         {body}
       </Window.Content>
     </Window>
-  );
+  ); // RS Edit: Adds Scrolling for 516 (Lira, May 2025)
 };
 
 const SleeperMain = (props, context) => {

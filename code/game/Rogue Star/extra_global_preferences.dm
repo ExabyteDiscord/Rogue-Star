@@ -127,7 +127,9 @@
 	client.prefs.extra_global_load()
 
 /mob/living/proc/check_vore_whitelist(var/mob/living/L,var/preftype,var/mode)	//Check if preftype is something we have on whitelist, and if so, if L is on our list
-	if(!(preftype in client.prefs_vr.vore_whitelist_toggles))
+	if(!client)	//not going to have a whitelist, so just say yes
+		return TRUE
+	if(!(preftype in client.prefs_vr.vore_whitelist_toggles))	//we don't care about this pref
 		return TRUE
 	if(client.prefs.vore_whitelist_preference != WL_BOTH)
 		if(client.prefs.vore_whitelist_preference == WL_PREY && mode != WL_PREY)
@@ -158,9 +160,11 @@
 		SPONT_PRED,
 		DROP_VORE,
 		STUMBLE_VORE,
+		BUCKLE_VORE, // Seperated out from stumble vore (Lira, January 2026)
 		SLIP_VORE,
 		THROW_VORE,
 		FOOD_VORE,
+		EMOTE_VORE, // Add emote spont vore (Lira, February 2026)
 		MICRO_PICKUP,
 		"Whitelist Pred/Prey"
 		)
@@ -193,21 +197,21 @@
 	if(preftype == MICRO_PICKUP)
 		if(!pred.pickup_pref || !pred.pickup_active || !prey.pickup_pref || !prey.pickup_active)
 			return FALSE
-		if(!check_vore_whitelist_pair(pred,prey,MICRO_PICKUP))
+		if(pred != prey && !prey.check_vore_whitelist(pred,MICRO_PICKUP))
 			return FALSE
 		return TRUE
 
 	if(preftype == RESIZING)
-		if(!pred.resizable || !prey.resizable)
+		if(!prey.resizable)	//Only check the prey since the pred won't be getting resized, and they might like to resize someone else
 			return FALSE
-		if(!check_vore_whitelist_pair(pred,prey,RESIZING))
+		if(pred != prey && !prey.check_vore_whitelist(pred,RESIZING))
 			return FALSE
 		return TRUE
 
 	if(preftype == SPONT_TF)
 		if(!pred.allow_spontaneous_tf || !prey.allow_spontaneous_tf)
 			return FALSE
-		if(!check_vore_whitelist_pair(pred,prey,SPONT_TF))
+		if(pred != prey && !prey.check_vore_whitelist(pred,SPONT_TF))
 			return FALSE
 		return TRUE
 
@@ -218,21 +222,22 @@
 		return FALSE
 	if(isanimal(pred) && !prey.allowmobvore)
 		return FALSE
-	if(!pred.can_be_drop_pred || !prey.can_be_drop_prey)	//Both of these always need to be true for any of the other spont vore checks to go through
+	if(pred != prey && !pred.can_be_drop_pred || !prey.can_be_drop_prey)	//Both of these always need to be true for any of the other spont vore checks to go through
 		return FALSE
-	if(!pred.client || !prey.client)
+	if(!pred.client || !prey.client)	//One doesn't have a client, so no chance of whitelist happening.
 		return TRUE
-	if(preftype != SPONT_PREY && preftype != SPONT_PRED)
-		if(!check_vore_whitelist_pair(pred,prey,SPONT_PRED))	//Let's check this since all the vore prefs need it
-			return FALSE
-	if(!check_vore_whitelist_pair(pred,prey,preftype))	//Let's check the whitelist for it all too.
+	if(pred != prey && !check_vore_whitelist_pair(pred,prey,preftype))	//Now let's check the whitelist for the preference, finally!!!
 		return FALSE
 
 	switch(preftype)
-		if(SPONT_PREY)	//We always check these no matter what, so, by now we already know this is allowed.
-			return TRUE
-		if(SPONT_PRED)	//See above
-			return TRUE
+		if(SPONT_PREY)	//Only test this on the prey
+			if(prey.client)
+				if(!prey.client.prefs_vr.can_be_drop_prey)
+					return FALSE
+		if(SPONT_PRED)	//Only test this on the pred
+			if(pred.client)
+				if(!pred.client.prefs_vr.can_be_drop_pred)
+					return FALSE
 
 		if(DROP_VORE)
 			if(prey.client)
@@ -248,6 +253,15 @@
 					return FALSE
 			if(pred.client)
 				if(!pred.client.prefs_vr.stumble_vore)
+					return FALSE
+
+		// Seperate out from stumble vore (Lira, September 2026)
+		if(BUCKLE_VORE)
+			if(prey.client)
+				if(!prey.client.prefs_vr.buckle_vore)
+					return FALSE
+			if(pred.client)
+				if(!pred.client.prefs_vr.buckle_vore)
 					return FALSE
 
 		if(SLIP_VORE)
@@ -272,6 +286,15 @@
 					return FALSE
 			if(pred.client)
 				if(!pred.client.prefs_vr.food_vore)
+					return FALSE
+
+		// Add emote spont vore (Lira, February 2026)
+		if(EMOTE_VORE)
+			if(prey.client)
+				if(!prey.client.prefs_vr.emote_vore)
+					return FALSE
+			if(pred.client)
+				if(!pred.client.prefs_vr.emote_vore)
 					return FALSE
 
 	return TRUE
@@ -408,6 +431,15 @@
 		variance = inactive
 	dat += {"<a href='?src=\ref[src];toggle_vore_trustlist=[STUMBLE_VORE]'>[variance] [STUMBLE_VORE]</a><br>"}
 
+	// Seperate out from stumble vore (Lira, January 2026)
+	if(!client.prefs_vr.buckle_vore)
+		variance = disabled
+	else if(BUCKLE_VORE in client.prefs_vr.vore_whitelist_toggles)
+		variance = active
+	else
+		variance = inactive
+	dat += {"<a href='?src=\ref[src];toggle_vore_trustlist=[BUCKLE_VORE]'>[variance] [BUCKLE_VORE]</a><br>"}
+
 	if(!client.prefs_vr.slip_vore)
 		variance = disabled
 	else if(SLIP_VORE in client.prefs_vr.vore_whitelist_toggles)
@@ -431,6 +463,15 @@
 	else
 		variance = inactive
 	dat += {"<a href='?src=\ref[src];toggle_vore_trustlist=[FOOD_VORE]'>[variance] [FOOD_VORE]</a> - "}
+
+	// Add emote spont vore (Lira, February 2026)
+	if(!client.prefs_vr.emote_vore)
+		variance = disabled
+	else if(EMOTE_VORE in client.prefs_vr.vore_whitelist_toggles)
+		variance = active
+	else
+		variance = inactive
+	dat += {"<a href='?src=\ref[src];toggle_vore_trustlist=[EMOTE_VORE]'>[variance] [EMOTE_VORE]</a><br>"}
 
 	if(!(pickup_pref && pickup_active))
 		variance = disabled
@@ -484,7 +525,16 @@
 	to_chat(src,SPAN_NOTICE("Remember to save your changes in the vore panel to have them stick!"))
 	vorePanel.unsaved_changes = TRUE
 
-/mob/living/proc/toggle_vore_trustlist_mode()
+// Adjusted to allow TGUI changes without opening html window (Lira, September 2025)
+/mob/living/proc/toggle_vore_trustlist_mode(var/new_mode)
+	if(new_mode)
+		if(!(new_mode in list(WL_BOTH, WL_PREY, WL_PRED)))
+			return
+		client.prefs.vore_whitelist_preference = new_mode
+		client.prefs.extra_global_save()
+		to_chat(src, SPAN_NOTICE("Trust list mode set to [new_mode]."))
+		return
+
 	var/choice = tgui_alert(src,"For preferences that the trust list is enabled for, setting this will allow trusted users to engage only with the selected mode, and will restrict all users from interacting with the opposite mode, if applicable. Which will you choose?","Trust List Mode",list("[WL_BOTH]","[WL_PREY]","[WL_PRED]"))
 
 	if(!choice)

@@ -131,7 +131,8 @@ var/list/admin_verbs_admin = list(
 	/client/proc/make_mentor,
 	/client/proc/unmake_mentor,
 	/client/proc/removetickets,
-	/client/proc/delbook
+	/client/proc/delbook,
+	/datum/admins/proc/EtchingViewer	// RS Add: Etching viewer support (Lira, December 2025)
 	)
 
 var/list/admin_verbs_ban = list(
@@ -178,7 +179,17 @@ var/list/admin_verbs_fun = list(
 	/client/proc/toggle_event_verb,		//RS ADD
 	/client/proc/change_station_name,	//RS ADD
 	/client/proc/pick_next_random_map,	//RS ADD
-	/client/proc/activate_vore_game	//RS ADD
+	/client/proc/activate_vore_game,	//RS ADD
+	/client/proc/summon,				//RS ADD
+	/client/proc/map_swap,				//RS ADD
+	/client/proc/add_trait,				//RS ADD
+	/client/proc/toggle_admin_secret_view,	//RS ADD
+	/client/proc/toggle_multichar,			//RS ADD
+	/client/proc/admin_lighting_manager,	// RS ADD: New Lighting Manager Panel (Lira, October 2025)
+	/client/proc/tag_game,					//RS ADD
+	/client/proc/report_all_objectives,		//RS ADD
+	/client/proc/reset_multipoint_trigger		//RS ADD
+
 	)
 
 var/list/admin_verbs_spawn = list(

@@ -71,6 +71,15 @@
 	var/status_enabled = client.is_preference_enabled(/datum/client_preference/status_indicators)
 	plane_holder.set_vis(VIS_STATUS, status_enabled)
 
+	//RS ADD START
+	if(client.holder && client.is_preference_enabled(/datum/client_preference/holder/show_staff_secrets))
+		plane_holder.set_vis(VIS_ADMIN_SECRET, TRUE)
+	else
+		plane_holder.set_vis(VIS_ADMIN_SECRET, FALSE)
+
+	reset_look()
+	//RS ADD END
+
 	//set macro to normal incase it was overriden (like cyborg currently does)
 	client.set_hotkeys_macro("macro", "hotkeymode")
 
@@ -88,3 +97,6 @@
 	if(src.client && src.bellies_loaded == FALSE) // Quick fix
 		log_debug("Fallback reload of bellies from [src.client] into [src]")
 		src.init_vore()
+	// RS Add: Restore character link from teleops on login (Lira, October 2025)
+	if(client)
+		client.rebuild_multichar_state_from_teleops()

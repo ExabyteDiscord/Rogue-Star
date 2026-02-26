@@ -1,12 +1,13 @@
 import { Component, createRef, RefObject } from 'inferno';
+import type { Inferno } from 'inferno'; // RS Edit: Inferno 7 to 9 (Lira, January 2026)
 
 const DEFAULT_ACCEPTABLE_DIFFERENCE = 5;
 
 type Props = {
-  acceptableDifference?: number;
-  maxWidth: number;
-  maxFontSize: number;
-  native?: HTMLAttributes<HTMLDivElement>;
+  readonly acceptableDifference?: number;
+  readonly maxWidth: number;
+  readonly maxFontSize: number;
+  readonly native?: Inferno.HTMLAttributes<HTMLDivElement>; // RS Edit: Inferno 7 to 9 (Lira, January 2026)
 };
 
 type State = {

@@ -63,14 +63,19 @@ V::::::V           V::::::VO:::::::OOO:::::::ORR:::::R     R:::::REE::::::EEEEEE
 	// These are 'modifier' prefs, do nothing on their own but pair with drop_prey/drop_pred settings.
 	var/drop_vore = TRUE
 	var/stumble_vore = TRUE
+	var/buckle_vore = TRUE // RS Add: Split from stumble (Lira, January 2026)
 	var/slip_vore = TRUE
 	var/throw_vore = TRUE
 	var/food_vore = TRUE
+	var/emote_vore = TRUE // RS Add: New emote spont vore (Lira, February 2026)
+	var/list/spont_belly_prefs = list() // RS Add: Add spont prefs (Lira, January 2026)
 
 	var/resizable = TRUE
 	var/show_vore_fx = TRUE
 	var/step_mechanics_pref = FALSE
 	var/pickup_pref = TRUE
+
+	var/autotransferable = TRUE //RS Add || Chomp Port 3200
 
 	var/vore_sprite_color = list("stomach" = "#000", "taur belly" = "#000") // RS edit
 	var/allow_contaminate = TRUE	//RS EDIT
@@ -131,6 +136,8 @@ V::::::V           V::::::VO:::::::OOO:::::::ORR:::::R     R:::::REE::::::EEEEEE
 //
 /proc/is_vore_predator(mob/living/O)
 	if(istype(O,/mob/living))
+		if(!O.vore_organs)	//RS ADD - it will runtime
+			return FALSE	//RS ADD
 		if(O.vore_organs.len > 0)
 			return TRUE
 
@@ -200,6 +207,9 @@ V::::::V           V::::::VO:::::::OOO:::::::ORR:::::R     R:::::REE::::::EEEEEE
 	food_vore = json_from_file["food_vore"]
 	throw_vore = json_from_file["throw_vore"]
 	stumble_vore = json_from_file["stumble_vore"]
+	buckle_vore = json_from_file["buckle_vore"] // RS Add: Split from stumble (Lira, January 2026)
+	emote_vore = json_from_file["emote_vore"] // RS Add: New emote spont vore (Lira, February 2026)
+	spont_belly_prefs = json_from_file["spont_belly_prefs"] // RS Add: Add spont prefs (Lira, January 2026)
 	nutrition_message_visible = json_from_file["nutrition_message_visible"]
 	nutrition_messages = json_from_file["nutrition_messages"]
 	weight_message_visible = json_from_file["weight_message_visible"]
@@ -211,6 +221,7 @@ V::::::V           V::::::VO:::::::OOO:::::::ORR:::::R     R:::::REE::::::EEEEEE
 	allow_contaminate = json_from_file["allow_contaminate"] // RS edit
 	allow_stripping = json_from_file["allow_stripping"] // RS edit
 	vore_whitelist_toggles = json_from_file["vore_whitelist_toggles"]	//RS ADD
+	autotransferable = json_from_file["autotransferable"] //RS Add || Chomp Port 3200
 
 	//Quick sanitize
 	if(isnull(digestable))
@@ -257,8 +268,19 @@ V::::::V           V::::::VO:::::::OOO:::::::ORR:::::R     R:::::REE::::::EEEEEE
 		throw_vore = TRUE
 	if(isnull(stumble_vore))
 		stumble_vore = TRUE
+	// RS Add: Split from stumble (Lira, January 2026)
+	if(isnull(buckle_vore))
+		buckle_vore = stumble_vore
 	if(isnull(food_vore))
 		food_vore = TRUE
+	// RS Add: New emote spont vore (Lira, February 2026)
+	if(isnull(emote_vore))
+		emote_vore = TRUE
+	// RS Add: Use spont belly (Lira, January 2026)
+	if(!islist(spont_belly_prefs))
+		spont_belly_prefs = list()
+	if(isnull(autotransferable)) //RS Add || Port Chomp 3200
+		autotransferable = TRUE
 	if(isnull(nutrition_message_visible))
 		nutrition_message_visible = TRUE
 	if(isnull(weight_message_visible))
@@ -340,8 +362,11 @@ V::::::V           V::::::VO:::::::OOO:::::::ORR:::::R     R:::::REE::::::EEEEEE
 			"drop_vore"				= drop_vore,
 			"slip_vore"				= slip_vore,
 			"stumble_vore"			= stumble_vore,
+			"buckle_vore"			= buckle_vore, // RS Add: Split from stumble (Lira, January 2026)
 			"throw_vore" 			= throw_vore,
 			"food_vore" 			= food_vore,
+			"emote_vore"			= emote_vore, // RS Add: New emote spont vore (Lira, February 2026)
+			"spont_belly_prefs"		= spont_belly_prefs, // RS Add: Use spont belly (Lira, January 2026)
 			"nutrition_message_visible"	= nutrition_message_visible,
 			"nutrition_messages"		= nutrition_messages,
 			"weight_message_visible"	= weight_message_visible,
@@ -353,6 +378,7 @@ V::::::V           V::::::VO:::::::OOO:::::::ORR:::::R     R:::::REE::::::EEEEEE
 			"allow_contaminate" 	= allow_contaminate, // RS edit
 			"allow_stripping" 		= allow_stripping, // RS edit
 			"vore_whitelist_toggles" = vore_whitelist_toggles, //RS ADD
+			"autotransferable"		= autotransferable, //RS Add || Port Chomp 3200
 		)
 
 	//List to JSON

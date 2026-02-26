@@ -2,8 +2,19 @@ import { filter, sortBy } from 'common/collections';
 import { Fragment } from 'inferno';
 import { formatTime } from '../format';
 import { useBackend, useLocalState } from '../backend';
-import { Box, Button, LabeledList, Section, Tabs, AnimatedNumber, Stack } from '../components';
-import { ComplexModal, modalRegisterBodyOverride } from '../interfaces/common/ComplexModal';
+import {
+  Box,
+  Button,
+  LabeledList,
+  Section,
+  Tabs,
+  AnimatedNumber,
+  Stack,
+} from '../components';
+import {
+  ComplexModal,
+  modalRegisterBodyOverride,
+} from '../interfaces/common/ComplexModal';
 import { Window } from '../layouts';
 import { flow } from 'common/fp';
 
@@ -43,7 +54,7 @@ export const SupplyConsole = (props, context) => {
   modalRegisterBodyOverride('view_crate', viewCrateContents);
   return (
     <Window width={700} height={620}>
-      <Window.Content>
+      <Window.Content scrollable>
         <ComplexModal maxWidth="100%" />
         <Section title="Supply Records">
           <SupplyConsoleShuttleStatus />
@@ -51,7 +62,7 @@ export const SupplyConsole = (props, context) => {
         </Section>
       </Window.Content>
     </Window>
-  );
+  ); // RS Edit: Make scrollable
 };
 
 const SupplyConsoleShuttleStatus = (props, context) => {

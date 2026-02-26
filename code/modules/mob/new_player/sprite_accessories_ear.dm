@@ -743,7 +743,7 @@
 	icon_state = "synthhorns_thick"
 	do_colouration = TRUE
 	color_blend_mode = ICON_MULTIPLY
-	extra_overlay = "synthhorns_thick_light"
+	extra_overlay = "synthhorns_thick_lights" // RS Edit: Fix typo (Lira, December 2025)
 
 /datum/sprite_accessory/ears/synthhorns_curly
 	name = "Synth horns, curly"
@@ -862,5 +862,11 @@
 	color_blend_mode = ICON_MULTIPLY
 	extra_overlay = "goatears_inner"
 	extra_overlay2 = "goatears_horns"
+
+/datum/sprite_accessory/ears/guilmonhorns //RS Add || Chomp Port 5771
+	name = "Guilmon Winghorns"
+	icon_state = "Guilmon_Horns"
+	do_colouration = 1
+	color_blend_mode = ICON_MULTIPLY
 
 // Special snowflake ears go below here.

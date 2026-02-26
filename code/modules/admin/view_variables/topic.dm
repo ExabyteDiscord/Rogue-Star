@@ -51,12 +51,14 @@
 	else if(href_list["varnamemass"] && href_list["datummass"])
 		if(!check_rights(R_VAREDIT))	return
 
-		var/atom/A = locate(href_list["datummass"])
-		if(!istype(A))
-			to_chat(usr, "This can only be used on instances of type /atom")
+		// RS Edit Start: Enhanced mass edit (Lira, February 2026)
+		var/D = locate(href_list["datummass"])
+		if(!istype(D,/datum) && !istype(D,/client))
+			to_chat(usr, "This can only be used on instances of types /client or /datum")
 			return
 
-		cmd_mass_modify_object_variables(A, href_list["varnamemass"])
+		cmd_mass_modify_object_variables(D, href_list["varnamemass"])
+		// RS Edit End
 
 	else if(href_list["mob_player_panel"])
 		if(!check_rights(0))	return
@@ -458,7 +460,15 @@
 			return
 		else
 			H.verbs -= verb
-
+	//RS Edit || Add smite to verb panel
+	else if(href_list["give_smite"])
+		if(!check_rights(R_DEBUG|R_ADMIN|R_EVENT))
+			return
+		var/mob/living/carbon/human/H = locate(href_list["give_smite"])
+		if(!ishuman(H)) //check if it is a human mob
+			return 		//If not, return
+		src.smite(H)
+	//RS Edit end
 	else if(href_list["addorgan"])
 		if(!check_rights(R_SPAWN))	return
 

@@ -20,6 +20,7 @@
 		/mob/living/simple_mob/vore/overmap/stardog,
 		/mob/living/simple_mob/vore/bigdragon,
 		/mob/living/silicon/ai,	//RS EDIT
+		/mob/living/silicon/robot/ai_shell,	// RS Add: Shells can't leave the station (Lira, October 2025)
 		/mob/observer/eye	//RS EDIT
 		)	//There are some things we don't want to come through no matter what.
 
@@ -35,10 +36,20 @@
 	return ..()
 
 /obj/machinery/cryopod/robot/door/gateway/redgate/proc/teleport(var/mob/M as mob)
+	// RS Add: Shells can't leave the station (Lira, October 2025)
+	if(isrobot(M))
+		var/mob/living/silicon/robot/R = M
+		if(R.shell)
+			to_chat(R, "<span class='warning'>The [src] rejects the remote shell and remains inert.</span>")
+			return
 	var/keycheck = TRUE
 	if(!isliving(M))		//We only want mob/living, no bullets or mechs or AI eyes or items
 		if(M.type in exceptions)
 			keycheck = FALSE		//we'll allow it
+		if(isanimal(M))
+			var/mob/living/simple_mob/S = M
+			if(S.load_owner && S.load_owner != "seriouslydontsavethis" && S.load_owner == "STATION")	//RS ADD - Is it someone's personal pet?
+				keycheck = FALSE	//RS ADD - Then allow it
 		else return
 	if(!restrict_mobs || M.faction == "neutral" || M.faction == "pet")
 		keycheck = FALSE		//Probably a pet or something people will want to vibe with
@@ -57,7 +68,7 @@
 	if(!target.special_condition(M))
 		return
 
-	var/turf/ourturf = find_our_turf(M)		//Find the turf on the opposite side of the target
+	var/turf/ourturf = find_opposite_side_or_randomize(M,src,target)		//Find the turf on the opposite side of the target	//RS EDIT
 	if(!ourturf.check_density(TRUE,TRUE))	//Make sure there isn't a wall there
 		M.unbuckle_all_mobs(TRUE)
 		M.stop_pulling()
@@ -65,14 +76,6 @@
 		M.forceMove(ourturf)		//Let's just do forcemove, I don't really want people teleporting to weird places if they have bluespace stuff
 	else
 		to_chat(M, "<span class='notice'>Something blocks your way.</span>")
-
-/obj/machinery/cryopod/robot/door/gateway/redgate/proc/find_our_turf(var/atom/movable/AM)	//This finds the turf on the opposite side of the target gate from where you are
-	var/offset_x = x - AM.x										//used for more smooth teleporting
-	var/offset_y = y - AM.y
-
-	var/turf/temptarg = locate((target.x + offset_x),(target.y + offset_y),target.z)
-
-	return temptarg
 
 /obj/machinery/cryopod/robot/door/gateway/redgate/update_icon()
 	return
